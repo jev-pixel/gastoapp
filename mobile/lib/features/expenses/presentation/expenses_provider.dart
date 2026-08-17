@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
-import '../../../core/api_client.dart';
 import '../data/expense_repository.dart';
 import '../domain/expense_model.dart';
 import '../domain/fixed_bill_model.dart';
@@ -8,22 +9,34 @@ import '../domain/fixed_bill_model.dart';
 class ExpensesProvider extends ChangeNotifier {
   final ExpenseRepository _repository;
 
-  ExpensesProvider(this._repository);
+  ExpensesProvider(this._repository) {
+    _expensesSub = _repository.watchExpenses().listen((data) {
+      expenses = data;
+      notifyListeners();
+    });
+    _billsSub = _repository.watchFixedBills().listen((data) {
+      fixedBills = data;
+      notifyListeners();
+    });
+  }
+
+  StreamSubscription<List<Expense>>? _expensesSub;
+  StreamSubscription<List<FixedBill>>? _billsSub;
 
   List<Expense> expenses = [];
   List<FixedBill> fixedBills = [];
   bool isLoading = false;
   String? errorMessage;
 
+  /// Pull-to-refresh entry point. The local streams above already keep the
+  /// UI live from the on-device cache; this just asks the repository to
+  /// reconcile with the server when possible (no-op if offline).
   Future<void> loadAll() async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
     try {
-      expenses = await _repository.listExpenses();
-      fixedBills = await _repository.listFixedBills();
-    } on ApiException catch (e) {
-      errorMessage = e.message;
+      await _repository.refreshFromServer();
     } finally {
       isLoading = false;
       notifyListeners();
@@ -34,53 +47,18 @@ class ExpensesProvider extends ChangeNotifier {
     required double amount,
     required ExpenseCategory category,
     String? description,
-  }) async {
-    try {
-      final expense = await _repository.createExpense(
-        amount: amount,
-        category: category,
-        description: description,
-      );
-      expenses = [expense, ...expenses];
-      notifyListeners();
-      return true;
-    } on ApiException catch (e) {
-      errorMessage = e.message;
-      notifyListeners();
-      return false;
-    }
+  }) {
+    return _repository.addExpense(amount: amount, category: category, description: description);
   }
 
-  Future<bool> deleteExpense(String id) async {
-    final previous = expenses;
-    expenses = expenses.where((e) => e.id != id).toList();
-    notifyListeners();
-    try {
-      await _repository.deleteExpense(id);
-      return true;
-    } on ApiException catch (e) {
-      expenses = previous; // rollback on failure
-      errorMessage = e.message;
-      notifyListeners();
-      return false;
-    }
-  }
+  Future<bool> deleteExpense(String id) => _repository.deleteExpense(id);
 
   Future<bool> addFixedBill({
     required String name,
     required double amount,
     required int dueDay,
-  }) async {
-    try {
-      final bill = await _repository.createFixedBill(name: name, amount: amount, dueDay: dueDay);
-      fixedBills = [...fixedBills, bill];
-      notifyListeners();
-      return true;
-    } on ApiException catch (e) {
-      errorMessage = e.message;
-      notifyListeners();
-      return false;
-    }
+  }) {
+    return _repository.addFixedBill(name: name, amount: amount, dueDay: dueDay);
   }
 
   Future<bool> updateFixedBill({
@@ -88,57 +66,22 @@ class ExpensesProvider extends ChangeNotifier {
     String? name,
     double? amount,
     int? dueDay,
-    bool? isPaidCurrentCycle,
-  }) async {
-    try {
-      final updated = await _repository.updateFixedBill(
-        id: id,
-        name: name,
-        amount: amount,
-        dueDay: dueDay,
-        isPaidCurrentCycle: isPaidCurrentCycle,
-      );
-      fixedBills = fixedBills.map((b) => b.id == id ? updated : b).toList();
-      notifyListeners();
-      return true;
-    } on ApiException catch (e) {
-      errorMessage = e.message;
-      notifyListeners();
-      return false;
-    }
+  }) {
+    return _repository.updateFixedBill(id: id, name: name, amount: amount, dueDay: dueDay);
   }
 
-Future<bool> toggleBillPaid(FixedBill bill) async {
-  try {
-    final updated = bill.isPaidCurrentCycle
-        ? await _repository.unpayFixedBill(bill.id)
-        : await _repository.payFixedBill(bill.id);
-    fixedBills = fixedBills.map((b) => b.id == bill.id ? updated : b).toList();
-    notifyListeners();
-    return true;
-  } on ApiException catch (e) {
-    errorMessage = e.message;
-    notifyListeners();
-    return false;
-  }
-}
+  Future<bool> toggleBillPaid(FixedBill bill) => _repository.toggleBillPaid(bill);
 
-  Future<bool> deleteFixedBill(String id) async {
-    final previous = fixedBills;
-    fixedBills = fixedBills.where((b) => b.id != id).toList();
-    notifyListeners();
-    try {
-      await _repository.deleteFixedBill(id);
-      return true;
-    } on ApiException catch (e) {
-      fixedBills = previous; // rollback on failure
-      errorMessage = e.message;
-      notifyListeners();
-      return false;
-    }
-  }
+  Future<bool> deleteFixedBill(String id) => _repository.deleteFixedBill(id);
 
   double get totalUnpaidFixedDues => fixedBills
       .where((b) => !b.isPaidCurrentCycle)
       .fold(0.0, (sum, b) => sum + b.amount);
+
+  @override
+  void dispose() {
+    _expensesSub?.cancel();
+    _billsSub?.cancel();
+    super.dispose();
+  }
 }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/api_client.dart';
+import 'core/connectivity_service.dart';
+import 'core/local_db/database.dart';
+import 'core/sync/sync_service.dart';
 import 'core/token_storage.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/auth_provider.dart';
@@ -22,11 +25,17 @@ void main() {
 
   final tokenStorage = TokenStorage();
   final apiClient = ApiClient(tokenStorage);
+  final appDatabase = AppDatabase();
+  final connectivityService = ConnectivityService();
+
   final authRepository = AuthRepository(apiClient, tokenStorage);
-  final expenseRepository = ExpenseRepository(apiClient);
+  final expenseRepository = ExpenseRepository(apiClient, appDatabase, connectivityService);
   final scenarioRepository = ScenarioRepository(apiClient);
 
-  final authProvider = AuthProvider(authRepository)..checkLoginState();
+  final syncService = SyncService(expenseRepository, connectivityService)..start();
+
+  final authProvider = AuthProvider(authRepository, expenseRepository: expenseRepository)
+    ..checkLoginState();
 
   apiClient.onUnauthorized = () {
     authProvider.forceLogout();
@@ -43,6 +52,10 @@ void main() {
       child: const GastoApp(),
     ),
   );
+
+  // syncService is intentionally kept alive for the app's lifetime via the
+  // closures above (SyncService.start() holds its own stream subscription);
+  // no explicit disposal wiring needed for a single-instance root app.
 }
 
 class GastoApp extends StatelessWidget {
@@ -64,7 +77,7 @@ class GastoApp extends StatelessWidget {
       '/dashboard': (_) => const DashboardScreen(),
       '/expenses': (_) => const ExpensesScreen(),
       '/scenario': (_) => const ScenarioInputScreen(),
-      '/edit-profile': (_) => const EditProfileScreen(), // new
+      '/edit-profile': (_) => const EditProfileScreen(),
     },
     );
   }

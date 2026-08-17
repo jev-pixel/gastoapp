@@ -27,6 +27,8 @@ mobile/ios/Flutter/Flutter.podspec
 mobile/*.iml
 mobile/.idea/
 
+mobile/android/key.properties
+
 # --- OS/Editor ---
 .DS_Store
 Thumbs.db
