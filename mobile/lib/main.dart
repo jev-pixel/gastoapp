@@ -17,6 +17,9 @@ import 'features/expenses/presentation/expenses_screen.dart';
 import 'features/scenario_ai/data/scenario_repository.dart';
 import 'features/scenario_ai/presentation/scenario_input_screen.dart';
 import 'features/scenario_ai/presentation/scenario_provider.dart';
+import 'features/wallet/data/wallet_repository.dart';
+import 'features/wallet/presentation/wallet_provider.dart';
+import 'features/wallet/presentation/wallet_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -31,6 +34,7 @@ void main() {
   final authRepository = AuthRepository(apiClient, tokenStorage);
   final expenseRepository = ExpenseRepository(apiClient, appDatabase, connectivityService);
   final scenarioRepository = ScenarioRepository(apiClient);
+  final walletRepository = WalletRepository(apiClient);
 
   final syncService = SyncService(expenseRepository, connectivityService)..start();
 
@@ -48,6 +52,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => authProvider),
         ChangeNotifierProvider(create: (_) => ExpensesProvider(expenseRepository)),
         ChangeNotifierProvider(create: (_) => ScenarioProvider(scenarioRepository)),
+        ChangeNotifierProvider(create: (_) => WalletProvider(walletRepository)),
       ],
       child: const GastoApp(),
     ),
@@ -78,6 +83,7 @@ class GastoApp extends StatelessWidget {
       '/expenses': (_) => const ExpensesScreen(),
       '/scenario': (_) => const ScenarioInputScreen(),
       '/edit-profile': (_) => const EditProfileScreen(),
+      '/wallet': (_) => const WalletScreen(),
     },
     );
   }

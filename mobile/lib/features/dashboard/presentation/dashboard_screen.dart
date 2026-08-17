@@ -118,6 +118,13 @@ actions: [
                     label: const Text('Manage Ledger'),
                     style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
                   ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).pushNamed('/wallet'),
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    label: const Text('Manage Allowances'),
+                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
                 ],
               ),
             ),

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints import auth, expenses, scenario
+from app.api.v1.endpoints import auth, expenses, scenario, wallet
 from app.db import base  # noqa: F401
 
 app = FastAPI(title="GastoApp API", version="1.0.0")
@@ -17,6 +17,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(expenses.router)
 app.include_router(scenario.router)
+app.include_router(wallet.router)
 
 
 @app.get("/health")

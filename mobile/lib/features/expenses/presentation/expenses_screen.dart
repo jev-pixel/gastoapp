@@ -8,6 +8,7 @@ import '../domain/fixed_bill_model.dart';
 import 'add_expense_sheet.dart';
 import 'add_fixed_bill_sheet.dart';
 import 'expenses_provider.dart';
+import 'fixed_bills_calendar.dart';
 
 final _currencyFormat = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
 
@@ -20,6 +21,7 @@ class ExpensesScreen extends StatefulWidget {
 
 class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  bool _showFixedBillsCalendar = true;
 
   @override
   void initState() {
@@ -36,6 +38,26 @@ class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProvid
     super.dispose();
   }
 
+  Future<bool> _handleTogglePaid(FixedBill bill) async {
+    final success = await context.read<ExpensesProvider>().toggleBillPaid(bill);
+    if (success && mounted) {
+      await context.read<AuthProvider>().refreshCurrentUser();
+    }
+    return success;
+  }
+
+  void _handleEdit(FixedBill bill) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => AddFixedBillSheet(existingBill: bill),
+    );
+  }
+
+  void _handleDelete(FixedBill bill) {
+    context.read<ExpensesProvider>().deleteFixedBill(bill.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ExpensesProvider>();
@@ -43,8 +65,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProvid
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ledger'),
+        actions: [
+          if (_tabController.index == 1)
+            IconButton(
+              icon: Icon(_showFixedBillsCalendar ? Icons.view_list : Icons.calendar_month),
+              tooltip: _showFixedBillsCalendar ? 'Switch to list view' : 'Switch to calendar view',
+              onPressed: () => setState(() => _showFixedBillsCalendar = !_showFixedBillsCalendar),
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
+          onTap: (_) => setState(() {}), // refresh actions[] when tab changes
           tabs: const [
             Tab(text: 'Expenses'),
             Tab(text: 'Fixed Bills'),
@@ -60,10 +91,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProvid
                   onRefresh: () => context.read<ExpensesProvider>().loadAll(),
                   child: _ExpensesList(expenses: provider.expenses),
                 ),
-                RefreshIndicator(
-                  onRefresh: () => context.read<ExpensesProvider>().loadAll(),
-                  child: _FixedBillsList(bills: provider.fixedBills),
-                ),
+                _showFixedBillsCalendar
+                    ? FixedBillsCalendarView(
+                        bills: provider.fixedBills,
+                        onTogglePaid: _handleTogglePaid,
+                        onEdit: _handleEdit,
+                        onDelete: _handleDelete,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => context.read<ExpensesProvider>().loadAll(),
+                        child: _FixedBillsList(bills: provider.fixedBills),
+                      ),
               ],
             ),
       floatingActionButton: FloatingActionButton(
