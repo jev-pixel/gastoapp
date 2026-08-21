@@ -96,6 +96,12 @@ class WalletTransactionEntry {
   final String? allowanceId;
   final String? fromAllowanceId;
   final String? toAllowanceId;
+  // Populated only for Fixed Due expenses — the date the bill is due.
+  final DateTime? dueDate;
+  // False = this is a reserved-but-unpaid Fixed Due; the wallet/allowance
+  // balance has not been deducted yet. True for everything else (and for
+  // a Fixed Due once it's been paid).
+  final bool isPaid;
   final DateTime createdAt;
 
   WalletTransactionEntry({
@@ -106,6 +112,8 @@ class WalletTransactionEntry {
     required this.allowanceId,
     required this.fromAllowanceId,
     required this.toAllowanceId,
+    required this.dueDate,
+    required this.isPaid,
     required this.createdAt,
   });
 
@@ -118,6 +126,8 @@ class WalletTransactionEntry {
       allowanceId: json['allowance_id'] as String?,
       fromAllowanceId: json['from_allowance_id'] as String?,
       toAllowanceId: json['to_allowance_id'] as String?,
+      dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
+      isPaid: json['is_paid'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }

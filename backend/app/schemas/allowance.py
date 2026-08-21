@@ -47,6 +47,13 @@ class AllowanceExpenseCreate(BaseModel):
     # Optional client-generated key (e.g. a UUID created once per submit
     # attempt) so a double-tapped submit button can't create two expenses.
     idempotency_key: str | None = Field(default=None, max_length=100)
+    # Required when category == FIXED_DUE — the actual due date of the bill.
+    due_date: datetime | None = None
+    # When category == FIXED_DUE, defaults to False: the expense/transaction
+    # is logged as "reserved" but the balance is NOT deducted until the
+    # user pays it via POST /wallet/expenses/{id}/pay. Ignored (treated as
+    # True) for every other category, which still deduct immediately.
+    is_paid_now: bool = False
 
 
 # ---- Transfers ----
@@ -71,6 +78,8 @@ class WalletTransactionRead(BaseModel):
     from_allowance_id: uuid.UUID | None
     to_allowance_id: uuid.UUID | None
     related_expense_id: uuid.UUID | None
+    due_date: datetime | None
+    is_paid: bool
     created_at: datetime
 
 

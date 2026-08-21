@@ -80,11 +80,17 @@ class WalletProvider extends ChangeNotifier {
   }
 
   /// [allowanceId] null = pay from unallocated funds directly.
+  /// [dueDate] pass this when [category] is 'fixed_due' — required by the
+  /// backend in that case.
+  /// [isPaidNow] only relevant for 'fixed_due': leave false (default) to
+  /// reserve the bill without touching the balance yet.
   Future<bool> spend({
     String? allowanceId,
     required double amount,
     required String category,
     String? description,
+    DateTime? dueDate,
+    bool isPaidNow = false,
   }) async {
     try {
       // Generated fresh per attempt, so a double-tap retry with the exact
@@ -95,7 +101,24 @@ class WalletProvider extends ChangeNotifier {
         category: category,
         description: description,
         idempotencyKey: _uuid.v4(),
+        dueDate: dueDate,
+        isPaidNow: isPaidNow,
       );
+      await loadSummary();
+      await loadTransactions();
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Marks a reserved Fixed Due transaction as paid — this is the point
+  /// where the wallet/allowance balance actually decreases.
+  Future<bool> payPendingExpense(String transactionId) async {
+    try {
+      await _repository.payPendingExpense(transactionId);
       await loadSummary();
       await loadTransactions();
       return true;

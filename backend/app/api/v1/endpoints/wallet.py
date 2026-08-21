@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import get_current_user
 from app.core.database import get_db
 from app.db.models.allowance import Allowance
-from app.db.models.expense import Expense
+from app.db.models.expense import Expense, ExpenseCategory
 from app.db.models.user import User
 from app.db.models.wallet_transaction import TransactionType, WalletTransaction
 from app.schemas.allowance import (
@@ -217,16 +217,24 @@ async def create_allowance_expense(
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=409, detail="This expense was already submitted")
 
+    if payload.category == ExpenseCategory.FIXED_DUE and payload.due_date is None:
+        raise HTTPException(status_code=400, detail="A due date is required for Fixed Due expenses")
+
+    # A Fixed Due defaults to "reserved, not yet paid" — no balance movement
+    # happens until the user explicitly pays it via /expenses/{id}/pay.
+    # Every other category (and any Fixed Due submitted with is_paid_now=True)
+    # keeps the original immediate-deduction behavior.
+    is_pending = payload.category == ExpenseCategory.FIXED_DUE and not payload.is_paid_now
+
     allowance: Allowance | None = None
     if payload.allowance_id is not None:
         allowance = await _get_owned_allowance(payload.allowance_id, db, current_user)
-        # Rule: expense cannot exceed allowance remaining balance.
-        if payload.amount > float(allowance.current_balance):
+        if not is_pending and payload.amount > float(allowance.current_balance):
             raise HTTPException(
                 status_code=400,
                 detail=f"Expense of {payload.amount:.2f} exceeds {allowance.name}'s remaining balance of {float(allowance.current_balance):.2f}",
             )
-    else:
+    elif not is_pending:
         unallocated = await _unallocated_balance(db, current_user)
         # Rule: expense cannot exceed unallocated balance.
         if payload.amount > unallocated:
@@ -237,9 +245,10 @@ async def create_allowance_expense(
 
     # Rule: wallet balance cannot be negative — final safety check even
     # though the allowance/unallocated checks above should already prevent
-    # this from being reachable.
+    # this from being reachable. Skipped entirely for pending Fixed Dues
+    # since they don't touch the balance yet.
     new_wallet_balance = float(current_user.current_wallet_balance) - payload.amount
-    if new_wallet_balance < 0:
+    if not is_pending and new_wallet_balance < 0:
         raise HTTPException(status_code=400, detail="Expense would make the wallet balance negative")
 
     expense = Expense(
@@ -247,14 +256,16 @@ async def create_allowance_expense(
         amount=payload.amount,
         category=payload.category,
         description=payload.description,
+        due_date=payload.due_date,
+        is_paid=not is_pending,
     )
     db.add(expense)
     await db.flush()
 
-    if allowance is not None:
-        allowance.current_balance = float(allowance.current_balance) - payload.amount
-
-    current_user.current_wallet_balance = new_wallet_balance
+    if not is_pending:
+        if allowance is not None:
+            allowance.current_balance = float(allowance.current_balance) - payload.amount
+        current_user.current_wallet_balance = new_wallet_balance
 
     tx = _log(
         current_user,
@@ -265,6 +276,8 @@ async def create_allowance_expense(
         related_expense_id=expense.id,
         idempotency_key=payload.idempotency_key,
     )
+    tx.due_date = payload.due_date
+    tx.is_paid = not is_pending
     db.add(tx)
 
     try:
@@ -273,6 +286,58 @@ async def create_allowance_expense(
         await db.rollback()
         raise HTTPException(status_code=409, detail="This expense was already submitted")
 
+    await db.refresh(tx)
+    return tx
+
+
+@router.post("/expenses/{transaction_id}/pay", response_model=WalletTransactionRead)
+async def pay_pending_expense(
+    transaction_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Settles a previously-reserved Fixed Due transaction: deducts the
+    allowance/wallet balance now and flips is_paid on both the transaction
+    and its linked Expense row. No-op-safe: rejects if already paid."""
+    result = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.id == transaction_id,
+            WalletTransaction.user_id == current_user.id,
+        )
+    )
+    tx = result.scalar_one_or_none()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if tx.is_paid:
+        raise HTTPException(status_code=400, detail="This expense is already marked as paid")
+
+    allowance: Allowance | None = None
+    if tx.allowance_id is not None:
+        allowance = await _get_owned_allowance(tx.allowance_id, db, current_user)
+        if float(tx.amount) > float(allowance.current_balance):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Payment of {float(tx.amount):.2f} exceeds {allowance.name}'s remaining balance",
+            )
+        allowance.current_balance = float(allowance.current_balance) - float(tx.amount)
+    else:
+        unallocated = await _unallocated_balance(db, current_user)
+        if float(tx.amount) > unallocated:
+            raise HTTPException(status_code=400, detail="Payment exceeds unallocated balance")
+
+    new_wallet_balance = float(current_user.current_wallet_balance) - float(tx.amount)
+    if new_wallet_balance < 0:
+        raise HTTPException(status_code=400, detail="Payment would make the wallet balance negative")
+    current_user.current_wallet_balance = new_wallet_balance
+    tx.is_paid = True
+
+    if tx.related_expense_id is not None:
+        expense_result = await db.execute(select(Expense).where(Expense.id == tx.related_expense_id))
+        linked_expense = expense_result.scalar_one_or_none()
+        if linked_expense:
+            linked_expense.is_paid = True
+
+    await db.commit()
     await db.refresh(tx)
     return tx
 

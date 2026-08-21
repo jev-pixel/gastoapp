@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,6 +32,14 @@ class Expense(Base):
     category: Mapped[ExpenseCategory] = mapped_column(Enum(ExpenseCategory), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # When category is FIXED_DUE, this is the date the bill is actually due.
+    # Optional for other categories.
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # False when this row represents a reserved-but-unpaid Fixed Due — the
+    # wallet/allowance balance has NOT been deducted for it yet. True for
+    # every other expense (which are still deducted immediately as before).
+    is_paid: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

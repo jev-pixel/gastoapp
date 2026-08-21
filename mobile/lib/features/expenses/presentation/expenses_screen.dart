@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/presentation/auth_provider.dart';
+import '../../wallet/domain/wallet_model.dart';
 import '../../wallet/presentation/wallet_provider.dart';
 import '../domain/expense_model.dart';
 import '../domain/fixed_bill_model.dart';
@@ -14,7 +15,12 @@ import 'fixed_bills_calendar.dart';
 final _currencyFormat = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
 
 class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({super.key});
+  /// Which tab to open on ("0" = Expenses, "1" = Fixed Bills). Lets other
+  /// screens (e.g. the Wallet screen's pending-dues banner) deep-link
+  /// straight into the calendar.
+  final int initialTabIndex;
+
+  const ExpensesScreen({super.key, this.initialTabIndex = 0});
 
   @override
   State<ExpensesScreen> createState() => _ExpensesScreenState();
@@ -27,9 +33,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ExpensesProvider>().loadAll();
+      // The Fixed Bills calendar also plots reserved wallet Fixed Due
+      // transactions, so make sure those are loaded too.
+      context.read<WalletProvider>().loadTransactions();
     });
   }
 
@@ -48,6 +61,14 @@ Future<bool> _handleTogglePaid(FixedBill bill) async {
   return success;
 }
 
+  Future<bool> _handlePayWalletDue(WalletTransactionEntry entry) async {
+    final success = await context.read<WalletProvider>().payPendingExpense(entry.id);
+    if (success && mounted) {
+      await context.read<AuthProvider>().refreshCurrentUser();
+    }
+    return success;
+  }
+
   void _handleEdit(FixedBill bill) {
     showModalBottomSheet(
       context: context,
@@ -63,6 +84,10 @@ Future<bool> _handleTogglePaid(FixedBill bill) async {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ExpensesProvider>();
+    final walletTransactions = context.watch<WalletProvider>().transactions;
+    // Only Fixed Due transactions carry a due_date — that's what makes them
+    // eligible for the calendar (as opposed to essential/wants spends).
+    final walletFixedDues = walletTransactions.where((t) => t.dueDate != null).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -96,9 +121,11 @@ Future<bool> _handleTogglePaid(FixedBill bill) async {
                 _showFixedBillsCalendar
                     ? FixedBillsCalendarView(
                         bills: provider.fixedBills,
+                        walletFixedDues: walletFixedDues,
                         onTogglePaid: _handleTogglePaid,
                         onEdit: _handleEdit,
                         onDelete: _handleDelete,
+                        onPayWalletDue: _handlePayWalletDue,
                       )
                     : RefreshIndicator(
                         onRefresh: () => context.read<ExpensesProvider>().loadAll(),

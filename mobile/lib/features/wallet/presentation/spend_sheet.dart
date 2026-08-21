@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../expenses/domain/expense_model.dart';
@@ -34,9 +35,24 @@ class _SpendSheetState extends State<SpendSheet> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   ExpenseCategory _category = ExpenseCategory.wants;
+  DateTime? _dueDate;
   late String _sourceId =
       widget.allowances.isNotEmpty ? widget.allowances.first.id : _unallocatedValue;
   bool _submitting = false;
+
+  Future<void> _pickDueDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? now,
+      firstDate: now,
+      lastDate: DateTime(now.year + 2),
+      helpText: 'Select due date',
+    );
+    if (picked != null) {
+      setState(() => _dueDate = picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,8 +144,55 @@ class _SpendSheetState extends State<SpendSheet> {
               items: ExpenseCategory.values
                   .map((c) => DropdownMenuItem(value: c, child: Text(c.label)))
                   .toList(),
-              onChanged: (value) => setState(() => _category = value!),
+              onChanged: (value) => setState(() {
+                _category = value!;
+                // Clear a previously-picked date if the user switches away
+                // from Fixed Due, so a stale date can't get silently reused.
+                if (_category != ExpenseCategory.fixedDue) _dueDate = null;
+              }),
             ),
+            if (_category == ExpenseCategory.fixedDue) ...[
+              const SizedBox(height: 14),
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: _pickDueDate,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Due date',
+                    prefixIcon: const Icon(Icons.event_outlined, size: 20, color: _Palette.textMuted),
+                    labelStyle: const TextStyle(color: _Palette.textMuted, fontSize: 13.5),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: _Palette.cardBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: _Palette.cardBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: _Palette.primaryStart, width: 1.6),
+                    ),
+                  ),
+                  child: Text(
+                    _dueDate == null ? 'Tap to select a date' : DateFormat.yMMMd().format(_dueDate!),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: _dueDate == null ? Theme.of(context).hintColor : const Color(0xFF14231C),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "This will be reserved but your balance won't be deducted until you mark it as paid.",
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.3),
+              ),
+            ],
             const SizedBox(height: 14),
             _SheetTextField(
               controller: _descriptionController,
@@ -172,9 +235,11 @@ class _SpendSheetState extends State<SpendSheet> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text(
-                              'Confirm Expense',
-                              style: TextStyle(
+                          : Text(
+                              _category == ExpenseCategory.fixedDue
+                                  ? 'Reserve Fixed Due'
+                                  : 'Confirm Expense',
+                              style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15,
                                 color: Colors.white,
@@ -194,6 +259,14 @@ class _SpendSheetState extends State<SpendSheet> {
   Future<void> _submit() async {
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) return;
+
+    if (_category == ExpenseCategory.fixedDue && _dueDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a due date for this Fixed Due.')),
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
     final provider = context.read<WalletProvider>();
     final success = await provider.spend(
@@ -202,6 +275,7 @@ class _SpendSheetState extends State<SpendSheet> {
       category: _category.apiValue,
       description:
           _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+      dueDate: _category == ExpenseCategory.fixedDue ? _dueDate : null,
     );
     if (!mounted) return;
     setState(() => _submitting = false);

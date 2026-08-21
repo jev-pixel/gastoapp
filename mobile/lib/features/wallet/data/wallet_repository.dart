@@ -35,12 +35,18 @@ class WalletRepository {
   Future<void> deleteAllowance(String id) => _api.delete('/wallet/allowances/$id');
 
   /// [allowanceId] null = pay from unallocated funds directly.
+  /// [dueDate] required by the backend when [category] is 'fixed_due'.
+  /// [isPaidNow] only matters for 'fixed_due': false (default) reserves the
+  /// expense without touching the balance; true deducts immediately like
+  /// every other category.
   Future<WalletTransactionEntry> createExpense({
     String? allowanceId,
     required double amount,
-    required String category, // 'essential' | 'wants' | 'fixed_due'
+    required String category,
     String? description,
     String? idempotencyKey,
+    DateTime? dueDate,
+    bool isPaidNow = false,
   }) async {
     final json = await _api.post('/wallet/expenses', {
       'allowance_id': allowanceId,
@@ -48,7 +54,16 @@ class WalletRepository {
       'category': category,
       'description': description,
       'idempotency_key': idempotencyKey,
+      'due_date': dueDate?.toIso8601String(),
+      'is_paid_now': isPaidNow,
     });
+    return WalletTransactionEntry.fromJson(json);
+  }
+
+  /// Settles a previously-reserved Fixed Due transaction: deducts the
+  /// balance now and marks it paid.
+  Future<WalletTransactionEntry> payPendingExpense(String transactionId) async {
+    final json = await _api.post('/wallet/expenses/$transactionId/pay', {});
     return WalletTransactionEntry.fromJson(json);
   }
 

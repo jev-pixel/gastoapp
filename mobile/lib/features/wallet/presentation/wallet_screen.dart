@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/presentation/auth_provider.dart';
+import '../../expenses/presentation/expenses_screen.dart';
 import '../domain/wallet_model.dart';
 import 'add_allowance_sheet.dart';
 import 'spend_sheet.dart';
@@ -22,6 +23,8 @@ class _Palette {
   static const primaryEnd = Color(0xFF1B7A4A);
   static const accentBlueStart = Color(0xFF2E6ADE);
   static const accentBlueEnd = Color(0xFF5B9BF0);
+  static const amberStart = Color(0xFFC77D1E);
+  static const amberEnd = Color(0xFFE0A23D);
   static const surface = Color(0xFFF6F8F5);
   static const cardBorder = Color(0xFFE7ECE6);
   static const textMuted = Color(0xFF6B7A70);
@@ -83,6 +86,8 @@ class _WalletScreenState extends State<WalletScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WalletProvider>().loadSummary();
+      // Needed so the pending-fixed-dues banner below has data to show.
+      context.read<WalletProvider>().loadTransactions();
     });
   }
 
@@ -91,6 +96,8 @@ class _WalletScreenState extends State<WalletScreen> {
     final auth = context.watch<AuthProvider>();
     final wallet = context.watch<WalletProvider>();
     final summary = wallet.summary;
+    final pendingFixedDues =
+        wallet.transactions.where((t) => !t.isPaid && t.dueDate != null).toList();
 
     return Scaffold(
       backgroundColor: _Palette.surface,
@@ -166,7 +173,10 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: () => context.read<WalletProvider>().loadSummary(),
+                  onRefresh: () => Future.wait([
+                    context.read<WalletProvider>().loadSummary(),
+                    context.read<WalletProvider>().loadTransactions(),
+                  ]),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -197,6 +207,17 @@ class _WalletScreenState extends State<WalletScreen> {
                       // Reserve space for the half of the FAB hanging below
                       // the card, plus breathing room before the next section.
                       const SizedBox(height: 52),
+                      if (pendingFixedDues.isNotEmpty) ...[
+                        _PendingFixedDuesBanner(
+                          entries: pendingFixedDues,
+                          onViewCalendar: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ExpensesScreen(initialTabIndex: 1),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -649,6 +670,97 @@ class _UnallocatedBanner extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: _Palette.accentBlueStart,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pending Fixed Dues banner — shows when there are reserved-but-unpaid
+// wallet Fixed Due transactions, with a shortcut to the calendar where
+// they can be reviewed (and paid) alongside recurring bills.
+// ---------------------------------------------------------------------------
+class _PendingFixedDuesBanner extends StatelessWidget {
+  const _PendingFixedDuesBanner({required this.entries, required this.onViewCalendar});
+  final List<WalletTransactionEntry> entries;
+  final VoidCallback onViewCalendar;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = entries.fold<double>(0, (s, e) => s + e.amount);
+    final count = entries.length;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_Palette.amberStart, _Palette.amberEnd],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _Palette.amberStart.withOpacity(0.22),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.event_busy_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.4),
+                    children: [
+                      TextSpan(
+                        text: '${_currency.format(total)} ',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      TextSpan(
+                        text: 'across $count fixed ${count == 1 ? "due" : "dues"} coming up.',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: onViewCalendar,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Text(
+                        'View calendar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: _Palette.amberStart,
                           fontSize: 13,
                         ),
                       ),
