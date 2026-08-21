@@ -116,6 +116,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       letterSpacing: -0.3,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).pushNamed('/wallet'),
+                      icon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
+                      label: const Text('Manage Allowances'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _Palette.primaryStart,
+                        side: const BorderSide(color: _Palette.primaryStart, width: 1.4),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   _BalanceCard(summary: wallet.summary, totalUnpaidDues: expenses.totalUnpaidFixedDues),
                   const SizedBox(height: 16),
@@ -192,21 +207,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onPressed: () => Navigator.of(context).pushNamed('/expenses'),
                       icon: const Icon(Icons.receipt_long_rounded, size: 20),
                       label: const Text('Manage Ledger'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _Palette.primaryStart,
-                        side: const BorderSide(color: _Palette.primaryStart, width: 1.4),
-                        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pushNamed('/wallet'),
-                      icon: const Icon(Icons.account_balance_wallet_rounded, size: 20),
-                      label: const Text('Manage Allowances'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: _Palette.primaryStart,
                         side: const BorderSide(color: _Palette.primaryStart, width: 1.4),
