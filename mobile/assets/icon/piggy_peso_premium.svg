@@ -1,0 +1,91 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6FA37F"/>
+      <stop offset="55%" stop-color="#3E7E58"/>
+      <stop offset="100%" stop-color="#215C3B"/>
+    </linearGradient>
+    <radialGradient id="bgGloss" cx="30%" cy="18%" r="55%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="headFill" cx="42%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="70%" stop-color="#F3EEE4"/>
+      <stop offset="100%" stop-color="#DCD4C2"/>
+    </radialGradient>
+    <radialGradient id="earFill" cx="38%" cy="28%" r="75%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E7E0D0"/>
+    </radialGradient>
+
+    <radialGradient id="eyeWhite" cx="38%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E9E4D8"/>
+    </radialGradient>
+    <radialGradient id="pupil" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#3C4A3F"/>
+      <stop offset="100%" stop-color="#111815"/>
+    </radialGradient>
+
+    <radialGradient id="snoutFill" cx="40%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#E9DCC0"/>
+      <stop offset="100%" stop-color="#CBB98F"/>
+    </radialGradient>
+
+    <linearGradient id="coinFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCE2A0"/>
+      <stop offset="55%" stop-color="#EFB43D"/>
+      <stop offset="100%" stop-color="#C9861B"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <filter id="tinyShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <!-- background -->
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#bgGloss)"/>
+
+    <!-- soft shadow cast by the piggy onto the background -->
+    <ellipse cx="512" cy="700" rx="290" ry="190" fill="#12331F" opacity="0.35" filter="url(#softShadow)"/>
+
+    <!-- peso coin, tilted, sitting above the piggy like a coin about to drop in -->
+    <g transform="rotate(-14 512 300)">
+      <ellipse cx="516" cy="312" rx="80" ry="80" fill="#0F5132" opacity="0.25" filter="url(#tinyShadow)"/>
+      <circle cx="512" cy="300" r="78" fill="url(#coinFill)"/>
+      <circle cx="512" cy="300" r="78" fill="none" stroke="#B9791A" stroke-width="4" opacity="0.6"/>
+      <text x="512" y="332" text-anchor="middle" font-family="Arial, sans-serif" font-size="88" font-weight="700" fill="#8A5B10">&#8369;</text>
+    </g>
+
+    <!-- ears peeking up first -->
+    <circle cx="372" cy="486" r="112" fill="url(#earFill)"/>
+    <circle cx="652" cy="486" r="112" fill="url(#earFill)"/>
+
+    <!-- head -->
+    <ellipse cx="512" cy="660" rx="272" ry="300" fill="url(#headFill)"/>
+
+    <!-- eyes -->
+    <circle cx="418" cy="672" r="92" fill="url(#eyeWhite)"/>
+    <circle cx="606" cy="672" r="92" fill="url(#eyeWhite)"/>
+    <circle cx="434" cy="690" r="46" fill="url(#pupil)"/>
+    <circle cx="622" cy="690" r="46" fill="url(#pupil)"/>
+    <circle cx="416" cy="670" r="16" fill="#FFFFFF" opacity="0.9"/>
+    <circle cx="604" cy="670" r="16" fill="#FFFFFF" opacity="0.9"/>
+
+    <!-- snout -->
+    <ellipse cx="512" cy="796" rx="118" ry="70" fill="url(#snoutFill)"/>
+    <ellipse cx="480" cy="800" rx="12" ry="16" fill="#8A7550" opacity="0.7"/>
+    <ellipse cx="546" cy="800" rx="12" ry="16" fill="#8A7550" opacity="0.7"/>
+  </g>
+</svg>

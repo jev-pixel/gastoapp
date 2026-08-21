@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../analytics/presentation/spending_analytics_screen.dart';
 import '../domain/wallet_model.dart';
 import 'wallet_provider.dart';
 
@@ -66,7 +67,19 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
     final transactions = context.watch<WalletProvider>().transactions;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Wallet History')),
+      appBar: AppBar(
+        title: const Text('Wallet History'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.insights_rounded),
+            tooltip: 'Spending analytics',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SpendingAnalyticsScreen()),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: transactions.isEmpty
           ? const Center(child: Text('No transactions yet.', style: TextStyle(color: Colors.grey)))
           : RefreshIndicator(
