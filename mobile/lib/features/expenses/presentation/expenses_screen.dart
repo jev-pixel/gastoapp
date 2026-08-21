@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/presentation/auth_provider.dart';
+import '../../wallet/presentation/wallet_provider.dart';
 import '../domain/expense_model.dart';
 import '../domain/fixed_bill_model.dart';
 import 'add_expense_sheet.dart';
@@ -38,13 +39,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> with SingleTickerProvid
     super.dispose();
   }
 
-  Future<bool> _handleTogglePaid(FixedBill bill) async {
-    final success = await context.read<ExpensesProvider>().toggleBillPaid(bill);
-    if (success && mounted) {
-      await context.read<AuthProvider>().refreshCurrentUser();
-    }
-    return success;
+Future<bool> _handleTogglePaid(FixedBill bill) async {
+  final success = await context.read<ExpensesProvider>().toggleBillPaid(bill);
+  if (success && mounted) {
+    await context.read<AuthProvider>().refreshCurrentUser();
+    await context.read<WalletProvider>().loadSummary();
   }
+  return success;
+}
 
   void _handleEdit(FixedBill bill) {
     showModalBottomSheet(
@@ -213,19 +215,20 @@ class _FixedBillsList extends StatelessWidget {
           confirmDismiss: (_) => _confirmDelete(context, b.name),
           onDismissed: (_) => context.read<ExpensesProvider>().deleteFixedBill(b.id),
           child: ListTile(
-leading: IconButton(
-  icon: Icon(
-    b.isPaidCurrentCycle ? Icons.check_circle : Icons.pending,
-    color: b.isPaidCurrentCycle ? Colors.green : Colors.orange,
-  ),
-  onPressed: () async {
-    final success = await context.read<ExpensesProvider>().toggleBillPaid(b);
-    if (success && context.mounted) {
-      await context.read<AuthProvider>().refreshCurrentUser();
-    }
-  },
-  tooltip: b.isPaidCurrentCycle ? 'Mark as unpaid' : 'Mark as paid',
-),
+            leading: IconButton(
+              icon: Icon(
+                b.isPaidCurrentCycle ? Icons.check_circle : Icons.pending,
+                color: b.isPaidCurrentCycle ? Colors.green : Colors.orange,
+              ),
+              onPressed: () async {
+                final success = await context.read<ExpensesProvider>().toggleBillPaid(b);
+                if (success && context.mounted) {
+                  await context.read<AuthProvider>().refreshCurrentUser();
+                  await context.read<WalletProvider>().loadSummary();
+                }
+              },
+              tooltip: b.isPaidCurrentCycle ? 'Mark as unpaid' : 'Mark as paid',
+            ),
             title: Text(b.name),
             subtitle: Text('Due on day ${b.dueDay} • ${b.isPaidCurrentCycle ? "Paid" : "Unpaid"}'),
             trailing: Text(
