@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../auth/presentation/auth_provider.dart';
 import '../domain/wallet_model.dart';
 import 'add_allowance_sheet.dart';
 import 'spend_sheet.dart';
@@ -87,6 +88,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     final wallet = context.watch<WalletProvider>();
     final summary = wallet.summary;
 
@@ -113,6 +115,31 @@ class _WalletScreenState extends State<WalletScreen> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const WalletHistoryScreen()),
             ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded),
+            tooltip: 'Edit profile',
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: _Palette.primaryStart,
+            ),
+            onPressed: () => Navigator.of(context).pushNamed('/edit-profile'),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Log out',
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: _Palette.primaryStart,
+            ),
+            onPressed: () async {
+              await auth.logout();
+              if (context.mounted) {
+                Navigator.of(context).pushReplacementNamed('/login');
+              }
+            },
           ),
           const SizedBox(width: 12),
         ],
