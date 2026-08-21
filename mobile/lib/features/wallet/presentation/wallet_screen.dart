@@ -144,8 +144,32 @@ class _WalletScreenState extends State<WalletScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     children: [
-                      _SummaryCard(summary: summary),
-                      const SizedBox(height: 24),
+                      // -----------------------------------------------------
+                      // Summary card with the Spend button floating,
+                      // fingerprint-style, over its bottom edge.
+                      // -----------------------------------------------------
+                      Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          _SummaryCard(summary: summary),
+                          Positioned(
+                            bottom: -38,
+                            child: _SpendFab(
+                              onPressed: () => showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) =>
+                                    SpendSheet(allowances: summary.allowances),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Reserve space for the half of the FAB hanging below
+                      // the card, plus breathing room before the next section.
+                      const SizedBox(height: 52),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -204,38 +228,20 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ),
                       const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _PrimaryActionButton(
-                              icon: Icons.remove_circle_rounded,
-                              label: 'Spend',
-                              onPressed: () => showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) =>
-                                    SpendSheet(allowances: summary.allowances),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _SecondaryActionButton(
-                              icon: Icons.swap_horiz_rounded,
-                              label: 'Transfer',
-                              onPressed: summary.allowances.isEmpty
-                                  ? null
-                                  : () => showModalBottomSheet(
-                                        context: context,
-                                        isScrollControlled: true,
-                                        backgroundColor: Colors.transparent,
-                                        builder: (_) => TransferSheet(
-                                            allowances: summary.allowances),
-                                      ),
-                            ),
-                          ),
-                        ],
+                      // Spend now lives in the floating button above, so
+                      // Transfer gets the full-width secondary slot here.
+                      _SecondaryActionButton(
+                        icon: Icons.swap_horiz_rounded,
+                        label: 'Transfer',
+                        onPressed: summary.allowances.isEmpty
+                            ? null
+                            : () => showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => TransferSheet(
+                                      allowances: summary.allowances),
+                                ),
                       ),
                     ],
                   ),
@@ -254,6 +260,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
@@ -333,6 +340,9 @@ class _SummaryCard extends StatelessWidget {
                 ),
               ],
             ),
+            // A little extra bottom breathing room so the floating Spend
+            // button doesn't crowd the stats row above it.
+            const SizedBox(height: 18),
           ],
         ),
       ),
@@ -374,6 +384,66 @@ class _MiniStat extends StatelessWidget {
             fontSize: 17,
             fontWeight: FontWeight.w800,
             color: emphasize ? const Color(0xFFBFF0C9) : Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Floating circular Spend button — "fingerprint" style primary action,
+// overlapping the bottom edge of the summary card.
+// ---------------------------------------------------------------------------
+class _SpendFab extends StatelessWidget {
+  const _SpendFab({required this.onPressed});
+  final VoidCallback onPressed;
+
+  static const double _diameter = 76;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: Container(
+              width: _diameter,
+              height: _diameter,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [_Palette.accentBlueStart, _Palette.accentBlueEnd],
+                ),
+                border: Border.all(color: _Palette.surface, width: 5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _Palette.accentBlueStart.withOpacity(0.45),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.payments_rounded,
+                  color: Colors.white, size: 30),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Spend',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 12.5,
+            color: _Palette.primaryStart,
+            letterSpacing: 0.2,
           ),
         ),
       ],
@@ -666,41 +736,8 @@ class _AllowanceCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Action buttons
+// Secondary action button (Transfer)
 // ---------------------------------------------------------------------------
-class _PrimaryActionButton extends StatelessWidget {
-  const _PrimaryActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 20),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _Palette.primaryStart,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SecondaryActionButton extends StatelessWidget {
   const _SecondaryActionButton({
     required this.icon,
@@ -715,6 +752,7 @@ class _SecondaryActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
+      width: double.infinity,
       height: 52,
       child: OutlinedButton.icon(
         onPressed: onPressed,
