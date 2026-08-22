@@ -12,6 +12,14 @@ def _validate_pin(value: str) -> str:
     return value
 
 
+def _normalize_email(value: str) -> str:
+    # Emails are case-insensitive by convention, but Postgres string
+    # equality isn't — without this, "Test@Test.com" at registration and
+    # "test@test.com" at login look like two different accounts and
+    # login fails with a generic 401 that gives no hint why.
+    return value.strip().lower()
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str  # 4-digit PIN — stored hashed, see security.py
@@ -19,6 +27,11 @@ class UserCreate(BaseModel):
     monthly_income: float = 0
     target_savings_floor: float = 0
     current_wallet_balance: float = 0
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return _normalize_email(v)
 
     @field_validator("password")
     @classmethod
@@ -29,6 +42,11 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str  # 4-digit PIN
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return _normalize_email(v)
 
     @field_validator("password")
     @classmethod
