@@ -10,7 +10,7 @@ class AuthRepository {
 
   Future<User> register({
     required String email,
-    required String password,
+    required String pin,
     required String fullName,
     double monthlyIncome = 0,
     double targetSavingsFloor = 0,
@@ -18,7 +18,9 @@ class AuthRepository {
   }) async {
     final json = await _api.post('/auth/register', {
       'email': email,
-      'password': password,
+      // Wire format key stays 'password' to match the backend schema —
+      // only the client-side terminology changed to PIN.
+      'password': pin,
       'full_name': fullName,
       'monthly_income': monthlyIncome,
       'target_savings_floor': targetSavingsFloor,
@@ -27,10 +29,10 @@ class AuthRepository {
     return User.fromJson(json);
   }
 
-  Future<void> login({required String email, required String password}) async {
+  Future<void> login({required String email, required String pin}) async {
     final json = await _api.post('/auth/login', {
       'email': email,
-      'password': password,
+      'password': pin,
     }, auth: false);
     await _tokenStorage.saveToken(json['access_token'] as String);
   }

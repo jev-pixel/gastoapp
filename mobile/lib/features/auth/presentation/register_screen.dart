@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'auth_provider.dart';
+import 'pin_input_field.dart';
 
 // ---------------------------------------------------------------------------
 // Design tokens — same palette as login_screen.dart for a consistent feel.
@@ -49,11 +51,53 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _monthlyIncomeController = TextEditingController();
   final _savingsFloorController = TextEditingController();
   final _walletBalanceController = TextEditingController();
-  bool _obscurePassword = true;
+
+  final _pinKey = GlobalKey<PinInputFieldState>();
+  final _confirmPinKey = GlobalKey<PinInputFieldState>();
+  String _pin = '';
+  String _confirmPin = '';
+  bool _obscurePin = true;
+  String? _pinValidationError;
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _monthlyIncomeController.dispose();
+    _savingsFloorController.dispose();
+    _walletBalanceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit(AuthProvider auth) async {
+    if (_pin.length != 4 || _confirmPin.length != 4) {
+      setState(() => _pinValidationError = 'Enter your 4-digit PIN twice to confirm it.');
+      HapticFeedback.mediumImpact();
+      return;
+    }
+    if (_pin != _confirmPin) {
+      setState(() => _pinValidationError = "PINs don't match — try entering them again.");
+      HapticFeedback.mediumImpact();
+      _confirmPinKey.currentState?.clear();
+      return;
+    }
+    setState(() => _pinValidationError = null);
+
+    final success = await auth.register(
+      email: _emailController.text.trim(),
+      pin: _pin,
+      fullName: _fullNameController.text.trim(),
+      monthlyIncome: double.tryParse(_monthlyIncomeController.text) ?? 0,
+      targetSavingsFloor: double.tryParse(_savingsFloorController.text) ?? 0,
+      currentWalletBalance: double.tryParse(_walletBalanceController.text) ?? 0,
+    );
+    if (success && mounted) {
+      Navigator.of(context).pushReplacementNamed('/dashboard');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,21 +134,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
               keyboardType: TextInputType.emailAddress,
               decoration: _fieldDecoration(label: 'Email', icon: Icons.mail_outline_rounded),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: _fieldDecoration(label: 'Password', icon: Icons.lock_outline_rounded).copyWith(
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Set a 4-Digit PIN',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _obscurePin = !_obscurePin),
+                  child: Icon(
+                    _obscurePin ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                     color: _Palette.textMuted,
-                    size: 20,
+                    size: 19,
                   ),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "You'll use this PIN to log in — no need to remember a full password.",
+              style: TextStyle(fontSize: 12.5, color: _Palette.textMuted, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            PinInputField(
+              key: _pinKey,
+              obscure: _obscurePin,
+              hasError: _pinValidationError != null,
+              onChanged: (value) => setState(() {
+                _pin = value;
+                _pinValidationError = null;
+              }),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Confirm PIN',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _Palette.textMuted),
+            ),
+            const SizedBox(height: 10),
+            PinInputField(
+              key: _confirmPinKey,
+              obscure: _obscurePin,
+              hasError: _pinValidationError != null,
+              onChanged: (value) => setState(() {
+                _confirmPin = value;
+                _pinValidationError = null;
+              }),
+            ),
+            if (_pinValidationError != null) ...[
+              const SizedBox(height: 10),
+              Center(
+                child: Text(
+                  _pinValidationError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: _Palette.danger, fontSize: 12.5),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 28),
             _SectionHeader(
               icon: Icons.pie_chart_outline_rounded,
@@ -173,22 +260,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: auth.isLoading
-                    ? null
-                    : () async {
-                        final success = await auth.register(
-                          email: _emailController.text.trim(),
-                          password: _passwordController.text,
-                          fullName: _fullNameController.text.trim(),
-                          monthlyIncome: double.tryParse(_monthlyIncomeController.text) ?? 0,
-                          targetSavingsFloor: double.tryParse(_savingsFloorController.text) ?? 0,
-                          currentWalletBalance:
-                              double.tryParse(_walletBalanceController.text) ?? 0,
-                        );
-                        if (success && mounted) {
-                          Navigator.of(context).pushReplacementNamed('/dashboard');
-                        }
-                      },
+                onPressed: auth.isLoading ? null : () => _submit(auth),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _Palette.primaryStart,
                   foregroundColor: Colors.white,

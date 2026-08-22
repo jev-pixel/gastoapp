@@ -36,12 +36,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String pin) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
     try {
-      await _repository.login(email: email, password: password);
+      await _repository.login(email: email, pin: pin);
       isLoggedIn = true;
       await _fetchUser();
       return true;
@@ -56,7 +56,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> register({
     required String email,
-    required String password,
+    required String pin,
     required String fullName,
     required double monthlyIncome,
     required double targetSavingsFloor,
@@ -68,14 +68,14 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _repository.register(
         email: email,
-        password: password,
+        pin: pin,
         fullName: fullName,
         monthlyIncome: monthlyIncome,
         targetSavingsFloor: targetSavingsFloor,
         currentWalletBalance: currentWalletBalance,
       );
       // Auto-login right after successful registration
-      await _repository.login(email: email, password: password);
+      await _repository.login(email: email, pin: pin);
       isLoggedIn = true;
       await _fetchUser();
       return true;

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../wallet/presentation/wallet_screen.dart';
 import 'auth_provider.dart';
+import 'pin_input_field.dart';
 import 'register_screen.dart';
 
 //----------------------------------------------------------------------------
@@ -132,8 +133,10 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+  final _pinKey = GlobalKey<PinInputFieldState>();
+  String _pin = '';
+  bool _obscurePin = true;
+  bool _pinError = false;
   bool _loginSucceeded = false;
 
   // Drives the one-shot welcome sequence: icon pops in with a small settle
@@ -287,18 +290,21 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _driftController.dispose();
     _successController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin(AuthProvider auth) async {
-    final success = await auth.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
+    if (_pin.length != 4) {
+      setState(() => _pinError = true);
+      HapticFeedback.mediumImpact();
+      return;
+    }
+
+    final success = await auth.login(_emailController.text.trim(), _pin);
     if (!mounted) return;
 
     if (success) {
+      setState(() => _pinError = false);
       HapticFeedback.lightImpact();
       setState(() => _loginSucceeded = true);
       await _successController.forward();
@@ -323,6 +329,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       );
     } else {
       HapticFeedback.mediumImpact();
+      setState(() => _pinError = true);
+      // Wrong PIN — clear the boxes so the person isn't stuck staring at
+      // four filled dots that no longer match what they typed.
+      _pinKey.currentState?.clear();
     }
   }
 
@@ -511,25 +521,44 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                           icon: Icons.mail_outline_rounded,
                                         ),
                                       ),
-                                      const SizedBox(height: 14),
-                                      TextField(
-                                        controller: _passwordController,
-                                        obscureText: _obscurePassword,
-                                        decoration: _fieldDecoration(
-                                          label: 'Password',
-                                          icon: Icons.lock_outline_rounded,
-                                          suffix: IconButton(
-                                            icon: Icon(
-                                              _obscurePassword
+                                      const SizedBox(height: 22),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            '4-Digit PIN',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: _Palette.textMuted,
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => setState(() => _obscurePin = !_obscurePin),
+                                            child: Icon(
+                                              _obscurePin
                                                   ? Icons.visibility_outlined
                                                   : Icons.visibility_off_outlined,
                                               color: _Palette.textMuted,
-                                              size: 20,
+                                              size: 19,
                                             ),
-                                            onPressed: () => setState(
-                                                () => _obscurePassword = !_obscurePassword),
                                           ),
-                                        ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      PinInputField(
+                                        key: _pinKey,
+                                        obscure: _obscurePin,
+                                        hasError: _pinError,
+                                        onChanged: (value) => setState(() {
+                                          _pin = value;
+                                          if (_pinError) _pinError = false;
+                                        }),
+                                        onCompleted: (_) {
+                                          if (!context.read<AuthProvider>().isLoading) {
+                                            _handleLogin(context.read<AuthProvider>());
+                                          }
+                                        },
                                       ),
                                     ],
                                   ),

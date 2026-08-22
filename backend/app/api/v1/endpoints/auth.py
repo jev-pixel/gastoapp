@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +11,12 @@ from app.db.models.user import User
 from app.schemas.user import Token, UserCreate, UserLogin, UserRead, UserUpdate
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+# A 4-digit PIN only has 10,000 combinations, so — unlike a real password —
+# it's meaningless to rely on hashing cost alone; it has to be paired with
+# a lockout or it's trivially guessable via online brute force.
+PIN_LOCKOUT_THRESHOLD = 5
+PIN_LOCKOUT_MINUTES = 5
 
 
 @router.get("/me", response_model=UserRead)
@@ -57,8 +65,30 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
+    now = datetime.now(timezone.utc)
+
+    # Locked accounts are rejected before even checking the PIN, so a
+    # locked-out attacker can't use response timing to learn anything.
+    if user and user.locked_until and user.locked_until > now:
+        wait_minutes = max(1, int((user.locked_until - now).total_seconds() // 60) + 1)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many incorrect PIN attempts. Try again in {wait_minutes} minute(s).",
+        )
+
     if not user or not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
+        if user:
+            user.failed_pin_attempts += 1
+            if user.failed_pin_attempts >= PIN_LOCKOUT_THRESHOLD:
+                user.locked_until = now + timedelta(minutes=PIN_LOCKOUT_MINUTES)
+            await db.commit()
+        raise HTTPException(status_code=401, detail="Incorrect email or PIN")
+
+    # Successful login — clear any accumulated strikes.
+    if user.failed_pin_attempts or user.locked_until:
+        user.failed_pin_attempts = 0
+        user.locked_until = None
+        await db.commit()
 
     token = create_access_token(subject=str(user.id))
     return Token(access_token=token)
