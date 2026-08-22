@@ -17,6 +17,11 @@ final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
 // ---------------------------------------------------------------------------
 // Design tokens — kept local so the file stays drop-in without touching
 // your app-wide theme. Feel free to move these into ThemeData later.
+//
+// Visual direction: a "widget dashboard" bento layout (macOS/iOS Big Sur
+// style) — big soft-rounded squircle tiles, gentle top-left glass sheen on
+// every gradient tile, and a floating three-button action dock that hovers
+// between the top row and the content below, echoing a macOS dock.
 // ---------------------------------------------------------------------------
 class _Palette {
   static const primaryStart = Color(0xFF0F5132);
@@ -25,6 +30,10 @@ class _Palette {
   static const accentBlueEnd = Color(0xFF5B9BF0);
   static const amberStart = Color(0xFFC77D1E);
   static const amberEnd = Color(0xFFE0A23D);
+  static const tealStart = Color(0xFF117F72);
+  static const tealEnd = Color(0xFF1FBFAA);
+  static const dockDark = Color(0xFF16241E);
+  static const dockDarkAlt = Color(0xFF223A2F);
   static const surface = Color(0xFFF6F8F5);
   static const cardBorder = Color(0xFFE7ECE6);
   static const textMuted = Color(0xFF6B7A70);
@@ -86,9 +95,43 @@ class _WalletScreenState extends State<WalletScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WalletProvider>().loadSummary();
-      // Needed so the pending-fixed-dues banner below has data to show.
+      // Needed so the calendar widget below has data to show.
       context.read<WalletProvider>().loadTransactions();
     });
+  }
+
+  void _openSpend(List<Allowance> allowances) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SpendSheet(allowances: allowances),
+    );
+  }
+
+  void _openAddAllowance() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const AddAllowanceSheet(),
+    );
+  }
+
+  void _openTransfer(List<Allowance> allowances) {
+    if (allowances.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TransferSheet(allowances: allowances),
+    );
+  }
+
+  void _openCalendar() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ExpensesScreen(initialTabIndex: 1)),
+    );
   }
 
   @override
@@ -182,73 +225,64 @@ class _WalletScreenState extends State<WalletScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     children: [
                       // -----------------------------------------------------
-                      // Summary card with the Spend button floating,
-                      // fingerprint-style, over its bottom edge.
+                      // Bento dashboard row: balance widget + calendar
+                      // widget, with a floating three-button dock hovering
+                      // over the seam between this row and the content
+                      // below — the "signature" macOS-widget touch.
                       // -----------------------------------------------------
                       Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.bottomCenter,
                         children: [
-                          _SummaryCard(summary: summary),
-                          Positioned(
-                            bottom: -38,
-                            child: _SpendFab(
-                              onPressed: () => showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) =>
-                                    SpendSheet(allowances: summary.allowances),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: SizedBox(
+                                  height: 196,
+                                  child: _BalanceBentoCard(summary: summary),
+                                ),
                               ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: SizedBox(
+                                  height: 196,
+                                  child: _CalendarBentoCard(
+                                    pendingEntries: pendingFixedDues,
+                                    onTap: _openCalendar,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Positioned(
+                            bottom: -40,
+                            child: _ActionDock(
+                              onAdd: _openAddAllowance,
+                              onSpend: () => _openSpend(summary.allowances),
+                              onTransfer: summary.allowances.isEmpty
+                                  ? null
+                                  : () => _openTransfer(summary.allowances),
                             ),
                           ),
                         ],
                       ),
-                      // Reserve space for the half of the FAB hanging below
-                      // the card, plus breathing room before the next section.
-                      const SizedBox(height: 52),
-                      if (pendingFixedDues.isNotEmpty) ...[
-                        _PendingFixedDuesBanner(
-                          entries: pendingFixedDues,
-                          onViewCalendar: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ExpensesScreen(initialTabIndex: 1),
-                            ),
-                          ),
+                      // Reserve space for the dock hanging below the row,
+                      // plus breathing room before the next section.
+                      const SizedBox(height: 60),
+                      const Text(
+                        'Allowances',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                         ),
-                        const SizedBox(height: 20),
-                      ],
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Allowances',
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          _NewAllowanceButton(
-                            onPressed: () => showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (_) => const AddAllowanceSheet(),
-                            ),
-                          ),
-                        ],
                       ),
                       const SizedBox(height: 12),
                       if (summary.allowances.isEmpty)
-                        _EmptyAllowancesState(
-                          onCreate: () => showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) => const AddAllowanceSheet(),
-                          ),
-                        )
+                        _EmptyAllowancesState(onCreate: _openAddAllowance)
                       else
                         GridView.builder(
                           shrinkWrap: true,
@@ -275,22 +309,6 @@ class _WalletScreenState extends State<WalletScreen> {
                                 builder: (_) => const WalletSimulatorScreen()),
                           ),
                         ),
-                      const SizedBox(height: 20),
-                      // Spend now lives in the floating button above, so
-                      // Transfer gets the full-width secondary slot here.
-                      _SecondaryActionButton(
-                        icon: Icons.swap_horiz_rounded,
-                        label: 'Transfer',
-                        onPressed: summary.allowances.isEmpty
-                            ? null
-                            : () => showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (_) => TransferSheet(
-                                      allowances: summary.allowances),
-                                ),
-                      ),
                     ],
                   ),
                 ),
@@ -299,18 +317,59 @@ class _WalletScreenState extends State<WalletScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Summary card
+// Decorative glass "sheen" — a soft diagonal highlight pinned to the
+// top-left of a gradient tile, the detail that reads as "macOS widget"
+// rather than a flat colored card. Purely cosmetic, never intercepts taps.
 // ---------------------------------------------------------------------------
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.summary});
+class _GlassSheen extends StatelessWidget {
+  const _GlassSheen({required this.radius});
+  final BorderRadius radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ClipRRect(
+          borderRadius: radius,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: FractionallySizedBox(
+              widthFactor: 0.75,
+              heightFactor: 0.55,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withOpacity(0.16),
+                      Colors.white.withOpacity(0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Balance bento card (left, large)
+// ---------------------------------------------------------------------------
+class _BalanceBentoCard extends StatelessWidget {
+  const _BalanceBentoCard({required this.summary});
   final WalletSummary summary;
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(28);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: radius,
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -318,81 +377,83 @@ class _SummaryCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: _Palette.primaryStart.withOpacity(0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: _Palette.primaryStart.withOpacity(0.30),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'CURRENT WALLET BALANCE',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: Colors.white.withOpacity(0.75),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.account_balance_wallet_rounded,
+                          color: Colors.white, size: 16),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Text(
-                  'CURRENT WALLET BALANCE',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
-                    color: Colors.white.withOpacity(0.75),
+                  _currency.format(summary.currentWalletBalance),
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.16),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.account_balance_wallet_rounded,
-                      color: Colors.white, size: 18),
+                const SizedBox(height: 16),
+                Container(height: 1, color: Colors.white.withOpacity(0.16)),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MiniStat(
+                        label: 'Allocated',
+                        value: _currency.format(summary.allocatedTotal),
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 30,
+                      color: Colors.white.withOpacity(0.16),
+                    ),
+                    Expanded(
+                      child: _MiniStat(
+                        label: 'Unallocated',
+                        value: _currency.format(summary.unallocatedBalance),
+                        emphasize: summary.unallocatedBalance > 0,
+                        alignEnd: true,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              _currency.format(summary.currentWalletBalance),
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(height: 1, color: Colors.white.withOpacity(0.16)),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _MiniStat(
-                    label: 'Allocated',
-                    value: _currency.format(summary.allocatedTotal),
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 34,
-                  color: Colors.white.withOpacity(0.16),
-                ),
-                Expanded(
-                  child: _MiniStat(
-                    label: 'Unallocated',
-                    value: _currency.format(summary.unallocatedBalance),
-                    emphasize: summary.unallocatedBalance > 0,
-                    alignEnd: true,
-                  ),
-                ),
-              ],
-            ),
-            // A little extra bottom breathing room so the floating Spend
-            // button doesn't crowd the stats row above it.
-            const SizedBox(height: 18),
-          ],
-        ),
+          ),
+          _GlassSheen(radius: radius),
+        ],
       ),
     );
   }
@@ -420,7 +481,7 @@ class _MiniStat extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11.5,
             color: Colors.white.withOpacity(0.75),
             fontWeight: FontWeight.w500,
           ),
@@ -429,7 +490,7 @@ class _MiniStat extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: 17,
+            fontSize: 15,
             fontWeight: FontWeight.w800,
             color: emphasize ? const Color(0xFFBFF0C9) : Colors.white,
           ),
@@ -440,17 +501,208 @@ class _MiniStat extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Floating circular Spend button — "fingerprint" style primary action,
-// overlapping the bottom edge of the summary card.
+// Calendar bento card (right, smaller) — a mini dot-grid "widget" of the
+// current month, with due days picked out, plus a reserved-bills chip.
+// Tapping it opens the Fixed Bills calendar.
 // ---------------------------------------------------------------------------
-class _SpendFab extends StatelessWidget {
-  const _SpendFab({required this.onPressed});
-  final VoidCallback onPressed;
+class _CalendarBentoCard extends StatelessWidget {
+  const _CalendarBentoCard({required this.pendingEntries, required this.onTap});
 
-  static const double _diameter = 76;
+  final List<WalletTransactionEntry> pendingEntries;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(28);
+    final now = DateTime.now();
+    final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
+    final dueDaysThisMonth = pendingEntries
+        .where((t) => t.dueDate!.year == now.year && t.dueDate!.month == now.month)
+        .map((t) => t.dueDate!.day)
+        .toSet();
+    final totalDue = pendingEntries.fold<double>(0, (s, e) => s + e.amount);
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_Palette.tealStart, _Palette.tealEnd],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _Palette.tealStart.withOpacity(0.30),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_month_rounded,
+                            color: Colors.white.withOpacity(0.9), size: 15),
+                        const SizedBox(width: 6),
+                        Text(
+                          'CALENDAR',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: Colors.white.withOpacity(0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: GridView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: daysInMonth,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 7,
+                          mainAxisSpacing: 3,
+                          crossAxisSpacing: 3,
+                        ),
+                        itemBuilder: (context, index) {
+                          final day = index + 1;
+                          final isDue = dueDaysThisMonth.contains(day);
+                          final isToday = day == now.day;
+                          return DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(3),
+                              color: isDue
+                                  ? Colors.white
+                                  : Colors.white.withOpacity(isToday ? 0.55 : 0.22),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: pendingEntries.isEmpty
+                            ? Colors.white.withOpacity(0.18)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                        child: Text(
+                          pendingEntries.isEmpty
+                              ? 'All bills clear'
+                              : '${pendingEntries.length} due · ${_currency.format(totalDue)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: pendingEntries.isEmpty
+                                ? Colors.white
+                                : _Palette.amberStart,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _GlassSheen(radius: radius),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Floating three-button action dock — the signature element. Sits between
+// the bento row above and the allowances grid below, echoing a macOS dock:
+// a bigger primary "Spend" circle flanked by two smaller dark utility
+// circles for Add / Transfer.
+// ---------------------------------------------------------------------------
+class _ActionDock extends StatelessWidget {
+  const _ActionDock({
+    required this.onAdd,
+    required this.onSpend,
+    required this.onTransfer,
+  });
+
+  final VoidCallback onAdd;
+  final VoidCallback onSpend;
+  final VoidCallback? onTransfer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        _DockButton(
+          icon: Icons.pie_chart_rounded,
+          label: 'Add',
+          onPressed: onAdd,
+        ),
+        const SizedBox(width: 18),
+        _DockButton(
+          icon: Icons.payments_rounded,
+          label: 'Spend',
+          diameter: 76,
+          iconSize: 30,
+          gradientColors: const [_Palette.accentBlueStart, _Palette.accentBlueEnd],
+          onPressed: onSpend,
+        ),
+        const SizedBox(width: 18),
+        _DockButton(
+          icon: Icons.swap_horiz_rounded,
+          label: 'Transfer',
+          onPressed: onTransfer,
+        ),
+      ],
+    );
+  }
+}
+
+class _DockButton extends StatelessWidget {
+  const _DockButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.diameter = 58,
+    this.iconSize = 22,
+    this.gradientColors,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final double diameter;
+  final double iconSize;
+  final List<Color>? gradientColors;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onPressed == null;
+    final colors = disabled
+        ? const [Color(0xFFB9C2BC), Color(0xFFB9C2BC)]
+        : (gradientColors ?? const [_Palette.dockDark, _Palette.dockDarkAlt]);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -461,81 +713,48 @@ class _SpendFab extends StatelessWidget {
             customBorder: const CircleBorder(),
             onTap: onPressed,
             child: Container(
-              width: _diameter,
-              height: _diameter,
+              width: diameter,
+              height: diameter,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [_Palette.accentBlueStart, _Palette.accentBlueEnd],
+                  colors: colors,
                 ),
                 border: Border.all(color: _Palette.surface, width: 5),
-                boxShadow: [
-                  BoxShadow(
-                    color: _Palette.accentBlueStart.withOpacity(0.45),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+                boxShadow: disabled
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: colors.first.withOpacity(0.42),
+                          blurRadius: 18,
+                          offset: const Offset(0, 9),
+                        ),
+                      ],
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Icon(icon, color: Colors.white, size: iconSize),
                   ),
+                  _GlassSheen(radius: BorderRadius.circular(diameter / 2)),
                 ],
               ),
-              child: const Icon(Icons.payments_rounded,
-                  color: Colors.white, size: 30),
             ),
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'Spend',
+        Text(
+          label,
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 12.5,
-            color: _Palette.primaryStart,
+            fontSize: 11.5,
+            color: disabled ? _Palette.textMuted : _Palette.primaryStart,
             letterSpacing: 0.2,
           ),
         ),
       ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// "New" allowance pill button
-// ---------------------------------------------------------------------------
-class _NewAllowanceButton extends StatelessWidget {
-  const _NewAllowanceButton({required this.onPressed});
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onPressed,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _Palette.cardBorder),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add_rounded, size: 18, color: _Palette.primaryStart),
-              SizedBox(width: 4),
-              Text(
-                'New',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _Palette.primaryStart,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -554,15 +773,15 @@ class _EmptyAllowancesState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: _Palette.cardBorder),
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE3F5DE),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE3F5DE),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.pie_chart_rounded,
@@ -605,9 +824,10 @@ class _UnallocatedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(22);
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: radius,
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -622,154 +842,68 @@ class _UnallocatedBanner extends StatelessWidget {
         ],
       ),
       padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.auto_awesome_rounded,
-                color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    style: const TextStyle(
-                        fontSize: 13, color: Colors.white, height: 1.4),
-                    children: [
-                      TextSpan(
-                        text: '${_currency.format(amount)} ',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      const TextSpan(
-                        text:
-                            'is sitting unallocated. Get a recommendation on what to do with it.',
-                      ),
-                    ],
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 10),
-                Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: onAskAi,
-                    child: const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      child: Text(
-                        'Ask AI',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: _Palette.accentBlueStart,
-                          fontSize: 13,
+                child: const Icon(Icons.auto_awesome_rounded,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text.rich(
+                      TextSpan(
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.white, height: 1.4),
+                        children: [
+                          TextSpan(
+                            text: '${_currency.format(amount)} ',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const TextSpan(
+                            text:
+                                'is sitting unallocated. Get a recommendation on what to do with it.',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: onAskAi,
+                        child: const Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          child: Text(
+                            'Ask AI',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: _Palette.accentBlueStart,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Pending Fixed Dues banner — shows when there are reserved-but-unpaid
-// wallet Fixed Due transactions, with a shortcut to the calendar where
-// they can be reviewed (and paid) alongside recurring bills.
-// ---------------------------------------------------------------------------
-class _PendingFixedDuesBanner extends StatelessWidget {
-  const _PendingFixedDuesBanner({required this.entries, required this.onViewCalendar});
-  final List<WalletTransactionEntry> entries;
-  final VoidCallback onViewCalendar;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = entries.fold<double>(0, (s, e) => s + e.amount);
-    final count = entries.length;
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [_Palette.amberStart, _Palette.amberEnd],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _Palette.amberStart.withOpacity(0.22),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.event_busy_rounded, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.4),
-                    children: [
-                      TextSpan(
-                        text: '${_currency.format(total)} ',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      TextSpan(
-                        text: 'across $count fixed ${count == 1 ? "due" : "dues"} coming up.',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: onViewCalendar,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      child: Text(
-                        'View calendar',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: _Palette.amberStart,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _GlassSheen(radius: radius),
         ],
       ),
     );
@@ -796,9 +930,9 @@ class _AllowanceCard extends StatelessWidget {
 
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(22),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         onTap: () => showModalBottomSheet(
           context: context,
           isScrollControlled: true,
@@ -807,8 +941,15 @@ class _AllowanceCard extends StatelessWidget {
         ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(22),
             border: Border.all(color: _Palette.cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -821,7 +962,7 @@ class _AllowanceCard extends StatelessWidget {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: bg,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(_iconForAllowance(allowance.name),
                         size: 16, color: fg),
@@ -867,46 +1008,6 @@ class _AllowanceCard extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Secondary action button (Transfer)
-// ---------------------------------------------------------------------------
-class _SecondaryActionButton extends StatelessWidget {
-  const _SecondaryActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 20),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _Palette.primaryStart,
-          disabledForegroundColor: _Palette.textMuted,
-          side: BorderSide(
-            color: onPressed == null ? _Palette.cardBorder : _Palette.primaryStart,
-            width: 1.4,
-          ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
           ),
         ),
       ),
