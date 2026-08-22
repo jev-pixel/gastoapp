@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'auth_provider.dart';
 import 'pin_input_field.dart';
 
+
+const String _emailDomain = '@gasto.ph';
 // ---------------------------------------------------------------------------
 // Design tokens — same palette as login_screen.dart for a consistent feel.
 // ---------------------------------------------------------------------------
@@ -86,14 +88,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     setState(() => _pinValidationError = null);
 
-    final success = await auth.register(
-      email: _emailController.text.trim(),
-      pin: _pin,
-      fullName: _fullNameController.text.trim(),
-      monthlyIncome: double.tryParse(_monthlyIncomeController.text) ?? 0,
-      targetSavingsFloor: double.tryParse(_savingsFloorController.text) ?? 0,
-      currentWalletBalance: double.tryParse(_walletBalanceController.text) ?? 0,
-    );
+      final success = await auth.register(
+        email: '${_emailController.text.trim()}$_emailDomain',
+        pin: _pin,
+        fullName: _fullNameController.text.trim(),
+        monthlyIncome: double.tryParse(_monthlyIncomeController.text) ?? 0,
+        targetSavingsFloor: double.tryParse(_savingsFloorController.text) ?? 0,
+        currentWalletBalance: double.tryParse(_walletBalanceController.text) ?? 0,
+      );
     if (success && mounted) {
       Navigator.of(context).pushReplacementNamed('/dashboard');
     }
@@ -132,7 +134,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: _fieldDecoration(label: 'Email', icon: Icons.mail_outline_rounded),
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(RegExp(r'[@\s]')),
+              ],
+              decoration: _fieldDecoration(
+                label: 'Username',
+                icon: Icons.mail_outline_rounded,
+              ).copyWith(
+                suffixText: _emailDomain,
+                suffixStyle: const TextStyle(
+                  color: _Palette.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             Row(

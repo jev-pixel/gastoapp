@@ -9,6 +9,8 @@ import 'auth_provider.dart';
 import 'pin_input_field.dart';
 import 'register_screen.dart';
 
+
+const String _emailDomain = '@gasto.ph';
 //----------------------------------------------------------------------------
 // Design tokens — mirrors the palette used across the app (wallet/dashboard)
 // so auth screens feel like part of the same product.
@@ -300,7 +302,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       return;
     }
 
-    final success = await auth.login(_emailController.text.trim(), _pin);
+    final username = _emailController.text.trim();
+    final email = '$username$_emailDomain';
+
+    final success = await auth.login(email, _pin);
     if (!mounted) return;
 
     if (success) {
@@ -516,9 +521,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       TextField(
                                         controller: _emailController,
                                         keyboardType: TextInputType.emailAddress,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.deny(RegExp(r'[@\s]')), // no @ or spaces
+                                        ],
                                         decoration: _fieldDecoration(
-                                          label: 'Email',
+                                          label: 'Username',
                                           icon: Icons.mail_outline_rounded,
+                                        ).copyWith(
+                                          suffixText: _emailDomain,
+                                          suffixStyle: const TextStyle(
+                                            color: _Palette.textMuted,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(height: 22),
