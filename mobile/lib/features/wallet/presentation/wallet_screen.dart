@@ -20,11 +20,10 @@ final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
 //
 // Visual direction: a "widget dashboard" bento layout (macOS/iOS Big Sur
 // style) — big soft-rounded squircle tiles, gentle top-left glass sheen on
-// every gradient tile, and a floating three-button action dock that hovers
-// between the top row and the content below, echoing a macOS dock. Text is
-// kept compact throughout so the tiles read as glanceable widgets rather
-// than dense data cards, and the dock buttons are enlarged + centered so
-// they read as the clear primary actions of the screen.
+// every gradient tile, and a floating three-button action dock that hangs
+// well below the bento row, echoing a macOS dock. The dock is the largest,
+// most prominent element on the screen; everything else is sized to feel
+// proportionate to it rather than competing with it.
 // ---------------------------------------------------------------------------
 class _Palette {
   static const primaryStart = Color(0xFF0F5132);
@@ -229,12 +228,12 @@ class _WalletScreenState extends State<WalletScreen> {
                     children: [
                       // -----------------------------------------------------
                       // Bento dashboard row: balance widget + calendar
-                      // widget, with a floating three-button dock hovering
-                      // over the seam between this row and the content
-                      // below — the "signature" macOS-widget touch. The
-                      // dock is wrapped in a full-width Center so it stays
-                      // truly centered on the screen regardless of the
-                      // bento row's own width above it.
+                      // widget, with a floating three-button dock hanging
+                      // well below the row (not hugging its bottom edge)
+                      // so it reads as its own prominent control cluster —
+                      // the "signature" macOS-widget touch. Centered via a
+                      // full-width Center wrapper so it stays centered on
+                      // the screen regardless of the bento row's width.
                       // -----------------------------------------------------
                       Stack(
                         clipBehavior: Clip.none,
@@ -246,7 +245,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               Expanded(
                                 flex: 3,
                                 child: SizedBox(
-                                  height: 188,
+                                  height: 196,
                                   child: _BalanceBentoCard(summary: summary),
                                 ),
                               ),
@@ -254,7 +253,7 @@ class _WalletScreenState extends State<WalletScreen> {
                               Expanded(
                                 flex: 2,
                                 child: SizedBox(
-                                  height: 188,
+                                  height: 196,
                                   child: _CalendarBentoCard(
                                     pendingEntries: pendingFixedDues,
                                     onTap: _openCalendar,
@@ -263,8 +262,11 @@ class _WalletScreenState extends State<WalletScreen> {
                               ),
                             ],
                           ),
+                          // Pushed further down (was -48) so the dock hangs
+                          // clearly below the bento row instead of
+                          // overlapping its bottom edge.
                           Positioned(
-                            bottom: -48,
+                            bottom: -78,
                             left: 0,
                             right: 0,
                             child: Center(
@@ -279,14 +281,13 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ],
                       ),
-                      // Reserve space for the (now larger) dock hanging
-                      // below the row, plus breathing room before the next
-                      // section.
-                      const SizedBox(height: 68),
+                      // Reserve space for the larger, lower-hanging dock,
+                      // plus breathing room before the next section.
+                      const SizedBox(height: 100),
                       const Text(
                         'Allowances',
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.3,
                         ),
@@ -304,7 +305,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             crossAxisCount: 2,
                             mainAxisSpacing: 12,
                             crossAxisSpacing: 12,
-                            childAspectRatio: 1.35,
+                            childAspectRatio: 1.3,
                           ),
                           itemBuilder: (context, index) => _AllowanceCard(
                             allowance: summary.allowances[index],
@@ -368,9 +369,7 @@ class _GlassSheen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Balance bento card (left, large) — text sizes trimmed down (30->26 on the
-// headline figure, 11->10 on labels) so it reads as a compact widget rather
-// than a full dashboard card.
+// Balance bento card (left, large)
 // ---------------------------------------------------------------------------
 class _BalanceBentoCard extends StatelessWidget {
   const _BalanceBentoCard({required this.summary});
@@ -409,7 +408,7 @@ class _BalanceBentoCard extends StatelessWidget {
                     Text(
                       'WALLET BALANCE',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
                         color: Colors.white.withOpacity(0.75),
@@ -426,19 +425,19 @@ class _BalanceBentoCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 6),
                 Text(
                   _currency.format(summary.currentWalletBalance),
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     letterSpacing: -0.4,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 Container(height: 1, color: Colors.white.withOpacity(0.16)),
-                const SizedBox(height: 12),
+                const SizedBox(height: 13),
                 Row(
                   children: [
                     Expanded(
@@ -449,7 +448,7 @@ class _BalanceBentoCard extends StatelessWidget {
                     ),
                     Container(
                       width: 1,
-                      height: 26,
+                      height: 28,
                       color: Colors.white.withOpacity(0.16),
                     ),
                     Expanded(
@@ -494,7 +493,7 @@ class _MiniStat extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 10.5,
             color: Colors.white.withOpacity(0.75),
             fontWeight: FontWeight.w500,
           ),
@@ -505,7 +504,7 @@ class _MiniStat extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.w800,
             color: emphasize ? const Color(0xFFBFF0C9) : Colors.white,
           ),
@@ -518,8 +517,7 @@ class _MiniStat extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Calendar bento card (right, smaller) — a mini dot-grid "widget" of the
 // current month, with due days picked out, plus a reserved-bills chip.
-// Tapping it opens the Fixed Bills calendar. Labels trimmed to match the
-// balance card's more compact type scale.
+// Tapping it opens the Fixed Bills calendar.
 // ---------------------------------------------------------------------------
 class _CalendarBentoCard extends StatelessWidget {
   const _CalendarBentoCard({required this.pendingEntries, required this.onTap});
@@ -563,19 +561,19 @@ class _CalendarBentoCard extends StatelessWidget {
           child: Stack(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+                padding: const EdgeInsets.fromLTRB(13, 15, 13, 11),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.calendar_month_rounded,
-                            color: Colors.white.withOpacity(0.9), size: 13),
+                            color: Colors.white.withOpacity(0.9), size: 14),
                         const SizedBox(width: 5),
                         Text(
                           'CALENDAR',
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.5,
                             color: Colors.white.withOpacity(0.85),
@@ -583,7 +581,7 @@ class _CalendarBentoCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 9),
                     Expanded(
                       child: GridView.builder(
                         physics: const NeverScrollableScrollPhysics(),
@@ -609,7 +607,7 @@ class _CalendarBentoCard extends StatelessWidget {
                         },
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 9),
                     DecoratedBox(
                       decoration: BoxDecoration(
                         color: pendingEntries.isEmpty
@@ -618,7 +616,7 @@ class _CalendarBentoCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(9),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6.5),
                         child: Text(
                           pendingEntries.isEmpty
                               ? 'All bills clear'
@@ -626,7 +624,7 @@ class _CalendarBentoCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 10,
                             fontWeight: FontWeight.w800,
                             color: pendingEntries.isEmpty
                                 ? Colors.white
@@ -648,12 +646,11 @@ class _CalendarBentoCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Floating three-button action dock — the signature element. Sits between
-// the bento row above and the allowances grid below, echoing a macOS dock:
-// a bigger primary "Spend" circle flanked by two smaller dark utility
-// circles for Add / Transfer. Sizes bumped up (58->66 / 76->92) and the
-// dock is centered by its parent (see the Center wrapper in WalletScreen)
-// rather than relying solely on the Stack's alignment.
+// Floating three-button action dock — the signature element, now the
+// clearly dominant control on the screen. Diameters bumped up again
+// (66->84 / 92->116) and it hangs 78px below the bento row (was 48), so it
+// reads as its own prominent cluster with breathing room on every side
+// rather than tucking under the cards above it.
 // ---------------------------------------------------------------------------
 class _ActionDock extends StatelessWidget {
   const _ActionDock({
@@ -678,16 +675,16 @@ class _ActionDock extends StatelessWidget {
           label: 'Add',
           onPressed: onAdd,
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 20),
         _DockButton(
           icon: Icons.payments_rounded,
           label: 'Spend',
-          diameter: 92,
-          iconSize: 36,
+          diameter: 116,
+          iconSize: 44,
           gradientColors: const [_Palette.accentBlueStart, _Palette.accentBlueEnd],
           onPressed: onSpend,
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 20),
         _DockButton(
           icon: Icons.swap_horiz_rounded,
           label: 'Transfer',
@@ -703,8 +700,8 @@ class _DockButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
-    this.diameter = 66,
-    this.iconSize = 25,
+    this.diameter = 84,
+    this.iconSize = 30,
     this.gradientColors,
   });
 
@@ -747,8 +744,8 @@ class _DockButton extends StatelessWidget {
                     : [
                         BoxShadow(
                           color: colors.first.withOpacity(0.42),
-                          blurRadius: 18,
-                          offset: const Offset(0, 9),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
                         ),
                       ],
               ),
@@ -763,14 +760,14 @@ class _DockButton extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         Text(
           label,
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 10,
+            fontSize: 11,
             color: disabled ? _Palette.textMuted : _Palette.primaryStart,
-            letterSpacing: 0.1,
+            letterSpacing: 0.15,
           ),
         ),
       ],
@@ -804,18 +801,18 @@ class _EmptyAllowancesState extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.pie_chart_rounded,
-                color: _Palette.primaryStart, size: 24),
+                color: _Palette.primaryStart, size: 26),
           ),
           const SizedBox(height: 14),
           const Text(
             'No allowances yet',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           ),
           const SizedBox(height: 4),
           const Text(
             'Split your wallet into budget envelopes to track\nspending by category.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: _Palette.textMuted, fontSize: 12, height: 1.4),
+            style: TextStyle(color: _Palette.textMuted, fontSize: 12.5, height: 1.4),
           ),
           const SizedBox(height: 16),
           TextButton.icon(
@@ -824,7 +821,7 @@ class _EmptyAllowancesState extends StatelessWidget {
             label: const Text('Create an allowance'),
             style: TextButton.styleFrom(
               foregroundColor: _Palette.primaryStart,
-              textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
             ),
           ),
         ],
@@ -834,8 +831,7 @@ class _EmptyAllowancesState extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// "Ask AI" unallocated balance banner — text sizes trimmed to match the
-// compact scale used elsewhere on the screen.
+// "Ask AI" unallocated balance banner
 // ---------------------------------------------------------------------------
 class _UnallocatedBanner extends StatelessWidget {
   const _UnallocatedBanner({required this.amount, required this.onAskAi});
@@ -861,22 +857,22 @@ class _UnallocatedBanner extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       child: Stack(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(9),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(11),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.auto_awesome_rounded,
-                    color: Colors.white, size: 18),
+                    color: Colors.white, size: 19),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -884,7 +880,7 @@ class _UnallocatedBanner extends StatelessWidget {
                     Text.rich(
                       TextSpan(
                         style: const TextStyle(
-                            fontSize: 12, color: Colors.white, height: 1.4),
+                            fontSize: 12.5, color: Colors.white, height: 1.4),
                         children: [
                           TextSpan(
                             text: '${_currency.format(amount)} ',
@@ -897,22 +893,22 @@ class _UnallocatedBanner extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 9),
+                    const SizedBox(height: 10),
                     Material(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(10),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(9),
+                        borderRadius: BorderRadius.circular(10),
                         onTap: onAskAi,
                         child: const Padding(
                           padding:
-                              EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                              EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
                           child: Text(
                             'Ask AI',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: _Palette.accentBlueStart,
-                              fontSize: 12,
+                              fontSize: 12.5,
                             ),
                           ),
                         ),
@@ -931,7 +927,7 @@ class _UnallocatedBanner extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Allowance card — text sizes trimmed to match the compact scale.
+// Allowance card
 // ---------------------------------------------------------------------------
 class _AllowanceCard extends StatelessWidget {
   const _AllowanceCard({required this.allowance, required this.colorIndex});
@@ -971,7 +967,7 @@ class _AllowanceCard extends StatelessWidget {
               ),
             ],
           ),
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -979,20 +975,20 @@ class _AllowanceCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(7),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: bg,
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(_iconForAllowance(allowance.name),
-                        size: 14, color: fg),
+                        size: 15, color: fg),
                   ),
-                  const SizedBox(width: 7),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       allowance.name,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 12.5),
+                          fontWeight: FontWeight.w700, fontSize: 13.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1005,20 +1001,20 @@ class _AllowanceCard extends StatelessWidget {
                   Text(
                     _currency.format(allowance.currentBalance),
                     style: const TextStyle(
-                        fontSize: 15.5,
+                        fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2),
+                        letterSpacing: -0.3),
                   ),
                   Text(
                     'of ${_currency.format(allowance.allocatedAmount)}',
-                    style: const TextStyle(fontSize: 10, color: _Palette.textMuted),
+                    style: const TextStyle(fontSize: 11, color: _Palette.textMuted),
                   ),
-                  const SizedBox(height: 7),
+                  const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
                       value: fraction,
-                      minHeight: 5,
+                      minHeight: 6,
                       backgroundColor: const Color(0xFFEFF2ED),
                       valueColor: AlwaysStoppedAnimation(
                         isLow ? _Palette.danger : fg,
