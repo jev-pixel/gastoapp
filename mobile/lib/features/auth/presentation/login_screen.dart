@@ -18,8 +18,12 @@ const String _emailDomain = '@gasto.ph';
 class _Palette {
   static const primaryStart = Color(0xFF0F5132);
   static const primaryEnd = Color(0xFF1B7A4A);
-  static const accentBlueStart = Color(0xFF2E6ADE);
-  static const accentBlueEnd = Color(0xFF5B9BF0);
+  // Warm gold accent — replaces the old blue blob so the background reads
+  // as a single deliberate "green + gold" family instead of two unrelated
+  // brand colors competing for attention.
+  static const goldStart = Color(0xFFB8892B);
+  static const goldEnd = Color(0xFFE8C468);
+  static const deepGreen = Color(0xFF0B3A24);
   static const surface = Color(0xFFF6F8F5);
   static const fieldFill = Color(0xFFFFFFFF);
   static const cardBorder = Color(0xFFE7ECE6);
@@ -126,6 +130,107 @@ class _DriftingBlob extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Painted wave band anchored to the bottom of the screen — the "green and
+// gold wave" backdrop. Two sine layers (a slow deep-green swell behind a
+// faster, thinner gold crest) scroll continuously via a single looping
+// controller, and both fade/rise in during the intro alongside the blobs.
+// ---------------------------------------------------------------------------
+class _WaveBackground extends StatelessWidget {
+  const _WaveBackground({
+    required this.entrance,
+    required this.drift,
+    required this.height,
+  });
+
+  final Animation<double> entrance;
+  final Animation<double> drift;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([entrance, drift]),
+        builder: (context, _) {
+          final rise = (1 - entrance.value) * 36;
+          return Opacity(
+            opacity: entrance.value.clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, rise),
+              child: SizedBox(
+                width: double.infinity,
+                height: height,
+                child: CustomPaint(
+                  painter: _WavePainter(progress: drift.value),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WavePainter extends CustomPainter {
+  _WavePainter({required this.progress});
+  final double progress; // 0..1, looping
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _paintLayer(
+      canvas,
+      size,
+      phaseShift: progress * 2 * math.pi,
+      waveHeight: size.height * 0.16,
+      baseline: size.height * 0.62,
+      wavelength: size.width * 0.9,
+      colors: [_Palette.deepGreen.withOpacity(0.16), _Palette.primaryStart.withOpacity(0.10)],
+    );
+    _paintLayer(
+      canvas,
+      size,
+      phaseShift: progress * 2 * math.pi * 1.4 + math.pi * 0.4,
+      waveHeight: size.height * 0.10,
+      baseline: size.height * 0.74,
+      wavelength: size.width * 0.65,
+      colors: [_Palette.goldEnd.withOpacity(0.22), _Palette.goldStart.withOpacity(0.12)],
+    );
+  }
+
+  void _paintLayer(
+    Canvas canvas,
+    Size size, {
+    required double phaseShift,
+    required double waveHeight,
+    required double baseline,
+    required double wavelength,
+    required List<Color> colors,
+  }) {
+    final paint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: colors,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final path = Path()..moveTo(0, size.height);
+    final step = size.width / 64;
+    for (double x = 0; x <= size.width; x += step) {
+      final y = baseline + math.sin((x / wavelength) * 2 * math.pi + phaseShift) * waveHeight;
+      path.lineTo(x, y);
+    }
+    path
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _WavePainter oldDelegate) => oldDelegate.progress != progress;
+}
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -170,6 +275,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   // Short "success" beat: the login button morphs into a checkmark before
   // handing off to the wallet, instead of the screen just vanishing.
   late final AnimationController _successController;
+
+  // Quick horizontal shake on a wrong PIN — a beat of feedback beyond just
+  // the red border, so the failure feels acknowledged rather than silent.
+  late final AnimationController _shakeController;
+  late final Animation<double> _shake;
 
   @override
   void initState() {
@@ -275,6 +385,15 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 420),
     );
 
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    // A decaying sine (amplitude shrinks as the controller runs 0→1) gives
+    // a natural "rattle that settles" feel rather than a mechanical
+    // back-and-forth of fixed size.
+    _shake = CurvedAnimation(parent: _shakeController, curve: Curves.linear);
+
     // Kick off the intro, then start the looping glow once it settles so
     // the pulse never fights with the pop-in scale.
     WidgetsBinding.instance.addPostFrameCallback((_) => _introController.forward());
@@ -291,6 +410,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _glowController.dispose();
     _driftController.dispose();
     _successController.dispose();
+    _shakeController.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -338,6 +458,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       // Wrong PIN — clear the boxes so the person isn't stuck staring at
       // four filled dots that no longer match what they typed.
       _pinKey.currentState?.clear();
+      _shakeController.forward(from: 0);
     }
   }
 
@@ -364,15 +485,27 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             ),
           ),
           Positioned(
-            bottom: -110,
+            bottom: -60,
             left: -80,
             child: _DriftingBlob(
               entrance: _blobEntrance,
               drift: _driftController,
               phase: math.pi * 0.7,
-              amplitude: 18,
-              colors: const [_Palette.accentBlueEnd, _Palette.accentBlueStart],
-              size: 300,
+              amplitude: 16,
+              colors: const [_Palette.goldEnd, _Palette.goldStart],
+              size: 280,
+            ),
+          ),
+          // Green-and-gold wave band, sitting behind the form and gently
+          // rolling for the life of the screen.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _WaveBackground(
+              entrance: _blobEntrance,
+              drift: _driftController,
+              height: MediaQuery.of(context).size.height * 0.46,
             ),
           ),
           SafeArea(
@@ -430,15 +563,29 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 child: RotationTransition(
                                   turns: _iconRotation,
                                   child: Container(
-                                    width: 84,
-                                    height: 84,
+                                    width: 88,
+                                    height: 88,
+                                    padding: const EdgeInsets.all(2),
                                     decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(24),
+                                      borderRadius: BorderRadius.circular(26),
+                                      // Thin gold hairline so the accent
+                                      // color reads as part of the mark
+                                      // itself, not just the backdrop.
+                                      gradient: const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [_Palette.goldEnd, _Palette.goldStart],
+                                      ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: _Palette.primaryStart.withOpacity(0.28),
                                           blurRadius: 20,
                                           offset: const Offset(0, 10),
+                                        ),
+                                        BoxShadow(
+                                          color: _Palette.goldStart.withOpacity(0.22),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 4),
                                         ),
                                       ],
                                     ),
@@ -560,19 +707,30 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                         ],
                                       ),
                                       const SizedBox(height: 10),
-                                      PinInputField(
-                                        key: _pinKey,
-                                        obscure: _obscurePin,
-                                        hasError: _pinError,
-                                        onChanged: (value) => setState(() {
-                                          _pin = value;
-                                          if (_pinError) _pinError = false;
-                                        }),
-                                        onCompleted: (_) {
-                                          if (!context.read<AuthProvider>().isLoading) {
-                                            _handleLogin(context.read<AuthProvider>());
-                                          }
+                                      AnimatedBuilder(
+                                        animation: _shake,
+                                        builder: (context, child) {
+                                          // Decaying sine: 4 rattles that
+                                          // shrink to zero as the controller
+                                          // finishes, instead of an abrupt stop.
+                                          final t = _shake.value;
+                                          final dx = math.sin(t * math.pi * 8) * (1 - t) * 10;
+                                          return Transform.translate(offset: Offset(dx, 0), child: child);
                                         },
+                                        child: PinInputField(
+                                          key: _pinKey,
+                                          obscure: _obscurePin,
+                                          hasError: _pinError,
+                                          onChanged: (value) => setState(() {
+                                            _pin = value;
+                                            if (_pinError) _pinError = false;
+                                          }),
+                                          onCompleted: (_) {
+                                            if (!context.read<AuthProvider>().isLoading) {
+                                              _handleLogin(context.read<AuthProvider>());
+                                            }
+                                          },
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -613,8 +771,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                         ),
                                       ],
                                       const SizedBox(height: 22),
-                                      SizedBox(
+                                      Container(
                                         height: 52,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(14),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: _Palette.goldStart.withOpacity(0.24),
+                                              blurRadius: 16,
+                                              offset: const Offset(0, 8),
+                                            ),
+                                          ],
+                                        ),
                                         child: ElevatedButton(
                                           onPressed: (auth.isLoading || _loginSucceeded)
                                               ? null
