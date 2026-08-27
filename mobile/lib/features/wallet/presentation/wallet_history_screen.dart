@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../analytics/presentation/spending_analytics_screen.dart';
 import '../domain/wallet_model.dart';
 import 'wallet_provider.dart';
+import 'wallet_theme.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
 final _dateFormat = DateFormat.yMMMd().add_jm();
@@ -67,33 +70,60 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
     final transactions = context.watch<WalletProvider>().transactions;
 
     return Scaffold(
+      backgroundColor: WalletPalette.canvasBottom,
       appBar: AppBar(
-        title: const Text('Wallet History'),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.66),
+                border: const Border(bottom: BorderSide(color: WalletPalette.hairline)),
+              ),
+            ),
+          ),
+        ),
+        title: const Text(
+          'Wallet History',
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.3, color: WalletPalette.ink),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.insights_rounded),
+          GlassIconButton(
+            icon: Icons.insights_rounded,
             tooltip: 'Spending analytics',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SpendingAnalyticsScreen()),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
         ],
       ),
-      body: transactions.isEmpty
-          ? const Center(child: Text('No transactions yet.', style: TextStyle(color: Colors.grey)))
-          : RefreshIndicator(
-              onRefresh: () => context.read<WalletProvider>().loadTransactions(),
-              child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: transactions.length,
-                itemBuilder: (context, index) => _TransactionTile(
-                  entry: transactions[index],
-                  isBusy: _payingId,
-                  onPay: () => _handlePay(transactions[index]),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WalletAmbientBackground()),
+          transactions.isEmpty
+              ? const Center(
+                  child: Text('No transactions yet.', style: TextStyle(color: WalletPalette.textMuted)))
+              : RefreshIndicator(
+                  onRefresh: () => context.read<WalletProvider>().loadTransactions(),
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                    itemCount: transactions.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) => _TransactionTile(
+                      entry: transactions[index],
+                      isBusy: _payingId,
+                      onPay: () => _handlePay(transactions[index]),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+        ],
+      ),
     );
   }
 }
@@ -123,17 +153,17 @@ class _TransactionTile extends StatelessWidget {
   }
 
   Color get _color {
-    if (_isPendingFixedDue) return Colors.orange;
+    if (_isPendingFixedDue) return WalletPalette.amberStart;
     switch (entry.type) {
       case WalletTransactionType.allocation:
-        return Colors.blue;
+        return WalletPalette.accentBlueStart;
       case WalletTransactionType.deallocation:
-        return Colors.grey;
+        return WalletPalette.textMuted;
       case WalletTransactionType.expenseAllowance:
       case WalletTransactionType.expenseUnallocated:
-        return Colors.red;
+        return WalletPalette.danger;
       case WalletTransactionType.transfer:
-        return Colors.purple;
+        return const Color(0xFF6C5CE7);
     }
   }
 
@@ -145,56 +175,79 @@ class _TransactionTile extends StatelessWidget {
       _dateFormat.format(entry.createdAt),
     ];
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: _color.withValues(alpha: 0.15),
-        child: Icon(_icon, color: _color, size: 20),
-      ),
-      title: Row(
-        children: [
-          Flexible(child: Text(entry.type.label)),
-          if (_isPendingFixedDue) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'UNPAID',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.orange),
-              ),
-            ),
-          ],
-        ],
-      ),
-      subtitle: Text(subtitleParts.join(' • ')),
-      isThreeLine: false,
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            _currency.format(entry.amount),
-            style: const TextStyle(fontWeight: FontWeight.bold),
+    return Material(
+      color: Colors.white.withOpacity(0.9),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _isPendingFixedDue && !isBusy ? onPay : null,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: WalletPalette.glassBorder),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
           ),
-          if (_isPendingFixedDue) ...[
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 26,
-              child: TextButton(
-                onPressed: isBusy ? null : onPay,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Mark as Paid', style: TextStyle(fontSize: 12)),
-              ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            leading: CircleAvatar(
+              backgroundColor: _color.withOpacity(0.14),
+              child: Icon(_icon, color: _color, size: 20),
             ),
-          ],
-        ],
+            title: Row(
+              children: [
+                Flexible(
+                  child: Text(entry.type.label,
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: WalletPalette.ink)),
+                ),
+                if (_isPendingFixedDue) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: WalletPalette.amberStart.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'UNPAID',
+                      style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w800, color: WalletPalette.amberStart),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            subtitle: Text(subtitleParts.join(' • '), style: const TextStyle(color: WalletPalette.textMuted)),
+            isThreeLine: false,
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _currency.format(entry.amount),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: WalletPalette.ink),
+                ),
+                if (_isPendingFixedDue) ...[
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    height: 26,
+                    child: TextButton(
+                      onPressed: isBusy ? null : onPay,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        foregroundColor: WalletPalette.primaryStart,
+                      ),
+                      child: const Text('Mark as Paid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
