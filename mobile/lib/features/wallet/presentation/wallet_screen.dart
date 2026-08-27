@@ -215,53 +215,42 @@ class _WalletScreenState extends State<WalletScreen> {
                           // the content below. Layout/positioning kept as
                           // approved — only the tile styling changed.
                           // -----------------------------------------------
-                          Stack(
-                            clipBehavior: Clip.none,
-                            alignment: Alignment.bottomCenter,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    flex: 3,
-                                    child: SizedBox(
-                                      height: 188,
-                                      child: _BalanceBentoCard(summary: summary),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    flex: 2,
-                                    child: SizedBox(
-                                      height: 188,
-                                      child: _CalendarBentoCard(
-                                        pendingEntries: pendingFixedDues,
-                                        onTap: _openCalendar,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Positioned(
-                                bottom: 158,
-                                left: 0,
-                                right: 0,
-                                child: Center(
-                                  child: _ActionDock(
-                                    onAdd: _openAddAllowance,
-                                    onSpend: () => _openSpend(summary.allowances),
-                                    onTransfer: summary.allowances.isEmpty
-                                        ? null
-                                        : () => _openTransfer(summary.allowances),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          // Reserve space for the dock hanging below the
-                          // row, plus breathing room before the next
-                          // section.
-                          const SizedBox(height: 40),
+Column(
+  children: [
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 3,
+          child: SizedBox(
+            height: 188,
+            child: _BalanceBentoCard(summary: summary),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 188,
+            child: _CalendarBentoCard(
+              pendingEntries: pendingFixedDues,
+              onTap: _openCalendar,
+            ),
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 16),
+    _ActionDock(
+      onAdd: _openAddAllowance,
+      onSpend: () => _openSpend(summary.allowances),
+      onTransfer: summary.allowances.isEmpty
+          ? null
+          : () => _openTransfer(summary.allowances),
+    ),
+  ],
+),
+const SizedBox(height: 24),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
