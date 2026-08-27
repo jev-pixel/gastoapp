@@ -1,6 +1,6 @@
-name: mobile
-description: "A new Flutter project."
-publish_to: 'none'
+name: GastoApp
+description: "A Budget App for managing your expenses and income"
+publish_to: 'JevGames'
 
 version: 1.0.0+1
 
