@@ -16,14 +16,13 @@ const String _emailDomain = '@gasto.ph';
 // so auth screens feel like part of the same product.
 //----------------------------------------------------------------------------
 class _Palette {
-  static const primaryStart = Color(0xFF0F5132);
-  static const primaryEnd = Color(0xFF1B7A4A);
-  // Warm gold accent — replaces the old blue blob so the background reads
-  // as a single deliberate "green + gold" family instead of two unrelated
-  // brand colors competing for attention.
-  static const goldStart = Color(0xFFB8892B);
-  static const goldEnd = Color(0xFFE8C468);
-  static const deepGreen = Color(0xFF0B3A24);
+  // Sourced directly from the app icon so the wave, glow, and gold accents
+  // read as one identity with the mark itself, not an approximation of it.
+  static const primaryStart = Color(0xFF123524); // icon background green
+  static const primaryEnd = Color(0xFF1B4A32); // lighter step for gradients
+  static const goldStart = Color(0xFFB8842A); // icon wing shadow-gold
+  static const goldEnd = Color(0xFFD9B65A); // icon wing highlight-gold
+  static const deepGreen = Color(0xFF0D261A); // icon's darkest ink green
   static const surface = Color(0xFFF6F8F5);
   static const fieldFill = Color(0xFFFFFFFF);
   static const cardBorder = Color(0xFFE7ECE6);
