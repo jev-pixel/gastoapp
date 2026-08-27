@@ -261,7 +261,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             ],
                           ),
                           Positioned(
-                            bottom: -34,
+                            bottom: -58,
                             left: 0,
                             right: 0,
                             child: Center(
@@ -278,7 +278,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                       // Reserve space for the dock hanging below the row,
                       // plus breathing room before the next section.
-                      const SizedBox(height: 46),
+                      const SizedBox(height: 70),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
