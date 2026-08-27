@@ -243,7 +243,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                 ],
                               ),
                               Positioned(
-                                bottom: -58,
+                                bottom: -18,
                                 left: 0,
                                 right: 0,
                                 child: Center(
