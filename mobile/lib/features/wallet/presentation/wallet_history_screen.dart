@@ -149,6 +149,10 @@ class _TransactionTile extends StatelessWidget {
         return Icons.shopping_bag_outlined;
       case WalletTransactionType.transfer:
         return Icons.swap_horiz;
+      case WalletTransactionType.cardAllowance:
+        return Icons.credit_card;
+      case WalletTransactionType.cardExpense:
+        return Icons.shopping_bag_outlined;
     }
   }
 
@@ -164,6 +168,10 @@ class _TransactionTile extends StatelessWidget {
         return WalletPalette.danger;
       case WalletTransactionType.transfer:
         return const Color(0xFF6C5CE7);
+      case WalletTransactionType.cardAllowance:
+        return WalletPalette.accentBlueStart;
+      case WalletTransactionType.cardExpense:
+        return WalletPalette.danger;
     }
   }
 
