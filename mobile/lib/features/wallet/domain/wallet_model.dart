@@ -52,6 +52,8 @@ enum WalletTransactionType {
   expenseAllowance,
   expenseUnallocated,
   transfer,
+  cardAllowance,   // NEW
+  cardExpense,     // NEW
 }
 
 extension WalletTransactionTypeX on WalletTransactionType {
@@ -67,10 +69,14 @@ extension WalletTransactionTypeX on WalletTransactionType {
         return 'Spent (Unallocated)';
       case WalletTransactionType.transfer:
         return 'Transfer';
+      case WalletTransactionType.cardAllowance:   // NEW
+        return 'Added (Card)';
+      case WalletTransactionType.cardExpense:      // NEW
+        return 'Spent (Card)';
     }
   }
 
-  static WalletTransactionType fromApiValue(String value) {
+   static WalletTransactionType fromApiValue(String value) {
     switch (value) {
       case 'allocation':
         return WalletTransactionType.allocation;
@@ -82,6 +88,10 @@ extension WalletTransactionTypeX on WalletTransactionType {
         return WalletTransactionType.expenseUnallocated;
       case 'transfer':
         return WalletTransactionType.transfer;
+      case 'card_allowance':          // NEW
+        return WalletTransactionType.cardAllowance;
+      case 'card_expense':            // NEW
+        return WalletTransactionType.cardExpense;
       default:
         throw ArgumentError('Unknown transaction type: $value');
     }
@@ -96,6 +106,9 @@ class WalletTransactionEntry {
   final String? allowanceId;
   final String? fromAllowanceId;
   final String? toAllowanceId;
+  final String? cardWalletId;
+  final String? fromCardWalletId;
+  final String? toCardWalletId;
   // Populated only for Fixed Due expenses — the date the bill is due.
   final DateTime? dueDate;
   // False = this is a reserved-but-unpaid Fixed Due; the wallet/allowance
@@ -112,6 +125,9 @@ class WalletTransactionEntry {
     required this.allowanceId,
     required this.fromAllowanceId,
     required this.toAllowanceId,
+    required this.cardWalletId,
+    required this.fromCardWalletId,
+    required this.toCardWalletId,
     required this.dueDate,
     required this.isPaid,
     required this.createdAt,
@@ -126,6 +142,9 @@ class WalletTransactionEntry {
       allowanceId: json['allowance_id'] as String?,
       fromAllowanceId: json['from_allowance_id'] as String?,
       toAllowanceId: json['to_allowance_id'] as String?,
+      cardWalletId: json['card_wallet_id'] as String?,
+      fromCardWalletId: json['from_card_wallet_id'] as String?,
+      toCardWalletId: json['to_card_wallet_id'] as String?,
       dueDate: json['due_date'] != null ? DateTime.parse(json['due_date'] as String) : null,
       isPaid: json['is_paid'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),

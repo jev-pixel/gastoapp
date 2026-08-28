@@ -81,6 +81,9 @@ class WalletTransactionRead(BaseModel):
     due_date: datetime | None
     is_paid: bool
     created_at: datetime
+    card_wallet_id: uuid.UUID | None = None        # NEW
+    from_card_wallet_id: uuid.UUID | None = None    # NEW
+    to_card_wallet_id: uuid.UUID | None = None       # NEW
 
 
 # ---- AI Simulator for unallocated funds ----

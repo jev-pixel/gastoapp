@@ -15,6 +15,8 @@ class TransactionType(str, enum.Enum):
     EXPENSE_ALLOWANCE = "expense_allowance"
     EXPENSE_UNALLOCATED = "expense_unallocated"
     TRANSFER = "transfer"
+    CARD_ALLOWANCE = "card_allowance"
+    CARD_EXPENSES = "card_expense"
 
 
 class WalletTransaction(Base):
@@ -43,6 +45,15 @@ class WalletTransaction(Base):
     )
     to_allowance_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("allowances.id", ondelete="SET NULL"), nullable=True
+    )
+    card_wallet_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("card_wallets.id", ondelete="SET NULL"), nullable=True
+    )
+    from_card_wallet_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("card_wallets.id", ondelete="SET NULL"), nullable=True
+    )
+    to_card_wallet_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("card_wallets.id", ondelete="SET NULL"), nullable=True
     )
     related_expense_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="SET NULL"), nullable=True

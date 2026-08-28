@@ -8,6 +8,9 @@ import '../../auth/presentation/auth_provider.dart';
 import '../../expenses/presentation/expenses_screen.dart';
 import '../domain/wallet_model.dart';
 import 'add_allowance_sheet.dart';
+import 'add_card_wallet_sheet.dart';
+import 'card_wallet_provider.dart';
+import 'card_wallet_screen.dart';
 import 'spend_sheet.dart';
 import 'transfer_sheet.dart';
 import 'wallet_history_screen.dart';
@@ -57,6 +60,7 @@ class _WalletScreenState extends State<WalletScreen> {
       context.read<WalletProvider>().loadSummary();
       // Needed so the calendar widget below has data to show.
       context.read<WalletProvider>().loadTransactions();
+      context.read<CardWalletProvider>().loadCardWallets();
     });
   }
 
@@ -85,6 +89,21 @@ class _WalletScreenState extends State<WalletScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => TransferSheet(allowances: allowances),
+    );
+  }
+
+  void _openAddCardWallet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const AddCardWalletSheet(),
+    );
+  }
+
+  void _openCardWallet(String id) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => CardWalletScreen(cardWalletId: id)),
     );
   }
 
@@ -295,6 +314,67 @@ const SizedBox(height: 24),
                                 colorIndex: index,
                               ),
                             ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Card Wallets',
+                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: WalletPalette.ink)),
+                              TextButton.icon(
+                                onPressed: _openAddCardWallet,
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Add'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Consumer<CardWalletProvider>(
+                            builder: (context, cardProvider, _) {
+                              if (cardProvider.cardWallets.isEmpty) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: Text('No card wallets yet — add one for BDO, GCash, Maya, etc.',
+                                      style: TextStyle(color: WalletPalette.textMuted, fontSize: 12.5)),
+                                );
+                              }
+                              return SizedBox(
+                                height: 96,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: cardProvider.cardWallets.length,
+                                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                                  itemBuilder: (context, index) {
+                                    final c = cardProvider.cardWallets[index];
+                                    return GestureDetector(
+                                      onTap: () => _openCardWallet(c.id),
+                                      child: Container(
+                                        width: 140,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: WalletPalette.glassBorder),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(c.provider,
+                                                style: const TextStyle(fontSize: 11, color: WalletPalette.textMuted, fontWeight: FontWeight.w700)),
+                                            const SizedBox(height: 4),
+                                            Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                            const Spacer(),
+                                            Text(_currency.format(c.currentBalance),
+                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
                           const SizedBox(height: 20),
                           if (summary.unallocatedBalance > 0)
                             _UnallocatedBanner(

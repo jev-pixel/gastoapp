@@ -39,3 +39,4 @@ class User(Base):
     scenario_logs: Mapped[list["AIScenarioLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     allowances: Mapped[list["Allowance"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     wallet_transactions: Mapped[list["WalletTransaction"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    card_wallets: Mapped[list["CardWallet"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # NEW

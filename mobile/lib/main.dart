@@ -17,7 +17,9 @@ import 'features/expenses/presentation/expenses_screen.dart';
 import 'features/scenario_ai/data/scenario_repository.dart';
 import 'features/scenario_ai/presentation/scenario_input_screen.dart';
 import 'features/scenario_ai/presentation/scenario_provider.dart';
+import 'features/wallet/data/card_wallet_repository.dart';
 import 'features/wallet/data/wallet_repository.dart';
+import 'features/wallet/presentation/card_wallet_provider.dart';
 import 'features/wallet/presentation/wallet_provider.dart';
 import 'features/wallet/presentation/wallet_screen.dart';
 
@@ -35,6 +37,7 @@ void main() {
   final expenseRepository = ExpenseRepository(apiClient, appDatabase, connectivityService);
   final scenarioRepository = ScenarioRepository(apiClient);
   final walletRepository = WalletRepository(apiClient);
+  final cardWalletRepository = CardWalletRepository(apiClient);
 
   final syncService = SyncService(expenseRepository, connectivityService)..start();
 
@@ -53,6 +56,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => ExpensesProvider(expenseRepository)),
         ChangeNotifierProvider(create: (_) => ScenarioProvider(scenarioRepository)),
         ChangeNotifierProvider(create: (_) => WalletProvider(walletRepository)),
+        ChangeNotifierProvider(create: (_) => CardWalletProvider(cardWalletRepository)),
       ],
       child: const GastoApp(),
     ),
