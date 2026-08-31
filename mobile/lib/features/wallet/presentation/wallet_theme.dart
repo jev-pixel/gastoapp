@@ -73,6 +73,71 @@ class WalletPalette {
   ];
 }
 
+/// Brand-flavored gradients for card wallets, so BDO/GCash/UnionBank/Maya
+/// read like distinct digital cards instead of one generic blue tile.
+class CardProviderStyle {
+  final List<Color> gradient;
+  final Color textColor;
+  final Color subTextColor;
+  final Color accent; // used for the little "chip" decoration
+  const CardProviderStyle({
+    required this.gradient,
+    this.textColor = Colors.white,
+    this.subTextColor = Colors.white70,
+    this.accent = Colors.white,
+  });
+}
+
+class CardProviderPalette {
+  CardProviderPalette._();
+
+  static const _bdo = CardProviderStyle(
+    gradient: [Color(0xFF002E6D), Color(0xFF0056B3)], // BDO navy/blue
+    textColor: Colors.white,
+    subTextColor: Color(0xFFBFD4FF),
+    accent: Color(0xFFF0B429), // gold chip
+  );
+
+  static const _gcash = CardProviderStyle(
+    gradient: [Color(0xFF00317F), Color(0xFF0072CE)], // GCash blue
+    textColor: Colors.white,
+    subTextColor: Color(0xFFBFE0FF),
+    accent: Colors.white,
+  );
+
+  static const _maya = CardProviderStyle(
+    gradient: [Color(0xFF0B0B0B), Color(0xFF00A651)], // Maya black/green
+    textColor: Colors.white,
+    subTextColor: Color(0xFFB8F5CE),
+    accent: Color(0xFF00D66B),
+  );
+
+  static const _unionBank = CardProviderStyle(
+    gradient: [Color(0xFFF7941D), Color(0xFFFFD65A)], // UnionBank yellow/gold
+    textColor: Color(0xFF1A1A1A),
+    subTextColor: Color(0xFF5B4300),
+    accent: Color(0xFF1A1A1A),
+  );
+
+  static const _other = CardProviderStyle(
+    gradient: [WalletPalette.accentBlueStart, WalletPalette.accentBlueEnd],
+  );
+
+  static CardProviderStyle of(String provider) {
+    switch (provider.toUpperCase()) {
+      case 'BDO':
+        return _bdo;
+      case 'GCASH':
+        return _gcash;
+      case 'MAYA':
+        return _maya;
+      case 'UNIONBANK':
+        return _unionBank;
+      default:
+        return _other;
+    }
+  }
+}
 /// Soft ambient color glow behind scaffold content — the same trick macOS
 /// uses under widgets and Control Center: barely-visible tinted blobs,
 /// heavily blurred, that never compete with foreground content. Sits as

@@ -345,27 +345,30 @@ const SizedBox(height: 24),
                                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                                   itemBuilder: (context, index) {
                                     final c = cardProvider.cardWallets[index];
+                                    final style = CardProviderPalette.of(c.provider);
                                     return GestureDetector(
                                       onTap: () => _openCardWallet(c.id),
                                       child: Container(
                                         width: 140,
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
                                           borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: WalletPalette.glassBorder),
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: style.gradient,
+                                          ),
                                         ),
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(c.provider,
-                                                style: const TextStyle(fontSize: 11, color: WalletPalette.textMuted, fontWeight: FontWeight.w700)),
+                                            Text(c.provider, style: TextStyle(fontSize: 11, color: style.subTextColor, fontWeight: FontWeight.w700)),
                                             const SizedBox(height: 4),
                                             Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: style.textColor)),
                                             const Spacer(),
                                             Text(_currency.format(c.currentBalance),
-                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: style.textColor)),
                                           ],
                                         ),
                                       ),

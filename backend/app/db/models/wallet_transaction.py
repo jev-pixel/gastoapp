@@ -16,7 +16,7 @@ class TransactionType(str, enum.Enum):
     EXPENSE_UNALLOCATED = "expense_unallocated"
     TRANSFER = "transfer"
     CARD_ALLOWANCE = "card_allowance"
-    CARD_EXPENSES = "card_expense"
+    CARD_EXPENSE = "card_expense"   # renamed from CARD_EXPENSES → matches DB enum + endpoint usage
 
 
 class WalletTransaction(Base):

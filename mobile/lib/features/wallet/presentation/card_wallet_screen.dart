@@ -56,10 +56,11 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+Widget build(BuildContext context) {
     final provider = context.watch<CardWalletProvider>();
     final wallet = provider.byId(widget.cardWalletId);
     final transactions = provider.transactionsByWallet[widget.cardWalletId] ?? const [];
+    final style = wallet != null ? CardProviderPalette.of(wallet.provider) : null;
 
     return Scaffold(
       backgroundColor: WalletPalette.canvasBottom,
@@ -92,27 +93,40 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [WalletPalette.accentBlueStart, WalletPalette.accentBlueEnd],
+                    Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: style!.gradient,
+                            ),
+                          ),
+                                            padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(wallet.provider.toUpperCase(),
+                                      style: TextStyle(color: style.subTextColor, fontSize: 12, fontWeight: FontWeight.w700)),
+                                  // little chip accent, mirrors the balance bento card
+                                  Container(
+                                    width: 30, height: 21,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(5),
+                                      color: style.accent.withOpacity(0.85),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(_currency.format(wallet.currentBalance),
+                                  style: TextStyle(color: style.textColor, fontSize: 30, fontWeight: FontWeight.w800)),
+                            ],
                           ),
                         ),
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(wallet.provider.toUpperCase(),
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
-                            Text(_currency.format(wallet.currentBalance),
-                                style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)),
-                          ],
-                        ),
-                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
