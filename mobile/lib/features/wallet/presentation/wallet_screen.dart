@@ -338,7 +338,7 @@ const SizedBox(height: 24),
                                 );
                               }
                               return SizedBox(
-                                height: 96,
+                                height: 118,
                                 child: ListView.separated(
                                   scrollDirection: Axis.horizontal,
                                   itemCount: cardProvider.cardWallets.length,
@@ -346,29 +346,66 @@ const SizedBox(height: 24),
                                   itemBuilder: (context, index) {
                                     final c = cardProvider.cardWallets[index];
                                     final style = CardProviderPalette.of(c.provider);
+                                    final cardRadius = BorderRadius.circular(16);
                                     return GestureDetector(
                                       onTap: () => _openCardWallet(c.id),
                                       child: Container(
-                                        width: 140,
-                                        padding: const EdgeInsets.all(12),
+                                        width: 168,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: cardRadius,
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                             colors: style.gradient,
                                           ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: style.gradient.first.withOpacity(0.30),
+                                              blurRadius: 14,
+                                              offset: const Offset(0, 7),
+                                            ),
+                                          ],
                                         ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                        child: Stack(
                                           children: [
-                                            Text(c.provider, style: TextStyle(fontSize: 11, color: style.subTextColor, fontWeight: FontWeight.w700)),
-                                            const SizedBox(height: 4),
-                                            Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: style.textColor)),
-                                            const Spacer(),
-                                            Text(_currency.format(c.currentBalance),
-                                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: style.textColor)),
+                                            Padding(
+                                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text(c.provider.toUpperCase(),
+                                                          style: TextStyle(
+                                                              fontSize: 10.5,
+                                                              color: style.subTextColor,
+                                                              fontWeight: FontWeight.w800,
+                                                              letterSpacing: 0.6)),
+                                                      AtmContactlessIcon(color: style.textColor.withOpacity(0.85), size: 15),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  const AtmChip(width: 24, height: 18),
+                                                  const Spacer(),
+                                                  MaskedCardNumber(
+                                                    lastFour: maskedCardDigits(c.id),
+                                                    color: style.textColor.withOpacity(0.9),
+                                                    fontSize: 10.5,
+                                                    compact: true,
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(c.name,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                          fontWeight: FontWeight.w700, fontSize: 11.5, color: style.textColor)),
+                                                  Text(_currency.format(c.currentBalance),
+                                                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: style.textColor)),
+                                                ],
+                                              ),
+                                            ),
+                                            GlassSheen(radius: cardRadius),
                                           ],
                                         ),
                                       ),
@@ -1026,15 +1063,16 @@ class _AllowanceCard extends StatelessWidget {
         ? 0.0
         : (allowance.currentBalance / allowance.allocatedAmount).clamp(0.0, 1.0);
 
-    final bg = WalletPalette.allowanceIconBg[colorIndex % WalletPalette.allowanceIconBg.length];
-    final fg = WalletPalette.allowanceIconFg[colorIndex % WalletPalette.allowanceIconFg.length];
+    final gradient = WalletPalette
+        .allowanceCardGradients[colorIndex % WalletPalette.allowanceCardGradients.length];
     final isLow = fraction <= 0.2;
+    final radius = BorderRadius.circular(22);
 
     return Material(
-      color: Colors.white.withOpacity(0.92),
-      borderRadius: BorderRadius.circular(22),
+      color: Colors.transparent,
+      borderRadius: radius,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: radius,
         onTap: () => showModalBottomSheet(
           context: context,
           isScrollControlled: true,
@@ -1043,72 +1081,97 @@ class _AllowanceCard extends StatelessWidget {
         ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: WalletPalette.glassBorder),
+            borderRadius: radius,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 5),
+                color: gradient.last.withOpacity(0.30),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Stack(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: bg,
-                      borderRadius: BorderRadius.circular(11),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.22),
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: Icon(_iconForAllowance(allowance.name), size: 14, color: Colors.white),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            allowance.name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 12.5, color: Colors.white),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isLow)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.92),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'LOW',
+                              style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: WalletPalette.danger),
+                            ),
+                          ),
+                      ],
                     ),
-                    child: Icon(_iconForAllowance(allowance.name), size: 14, color: fg),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      allowance.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 12.5, color: WalletPalette.ink),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currency.format(allowance.currentBalance),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: Colors.white,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        Text(
+                          'of ${_currency.format(allowance.allocatedAmount)}',
+                          style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.78)),
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: fraction,
+                            minHeight: 6,
+                            backgroundColor: Colors.white.withOpacity(0.24),
+                            valueColor: AlwaysStoppedAnimation(
+                              isLow ? const Color(0xFFFFE3E1) : Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _currency.format(allowance.currentBalance),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                      color: WalletPalette.ink,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  Text(
-                    'of ${_currency.format(allowance.allocatedAmount)}',
-                    style: const TextStyle(fontSize: 10, color: WalletPalette.textMuted),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: fraction,
-                      minHeight: 6,
-                      backgroundColor: const Color(0xFFEDF1EC),
-                      valueColor: AlwaysStoppedAnimation(isLow ? WalletPalette.danger : fg),
-                    ),
-                  ),
-                ],
-              ),
+              GlassSheen(radius: radius),
             ],
           ),
         ),

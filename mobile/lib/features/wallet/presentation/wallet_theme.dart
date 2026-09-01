@@ -71,6 +71,134 @@ class WalletPalette {
     Color(0xFFB98A16),
     Color(0xFF6C5CE7),
   ];
+
+  // Full-bleed gradient pairs for the "card style" allowance tiles — each
+  // allowance gets a saturated color card instead of a plain white tile
+  // with a colored icon badge. Order/hue-family matches allowanceIconFg
+  // above so an allowance's identity color stays consistent everywhere
+  // it appears (icon chip, progress bar, full card).
+  static const allowanceCardGradients = [
+    [Color(0xFFEC9A5D), Color(0xFFD9772E)], // orange
+    [Color(0xFF6FA4FF), Color(0xFF2A63D6)], // blue
+    [Color(0xFF3FD1AE), Color(0xFF0E8F63)], // green/teal
+    [Color(0xFFE79BCB), Color(0xFFC1428A)], // pink
+    [Color(0xFFE9C765), Color(0xFFB98A16)], // amber/gold
+    [Color(0xFFA597F5), Color(0xFF6C5CE7)], // purple
+  ];
+}
+
+/// Derives a stable pseudo card number's last 4 digits from any seed
+/// string (an id, a name) so the same wallet always shows the same
+/// "masked" digits instead of a random one on every rebuild.
+String maskedCardDigits(String seed) {
+  final n = seed.hashCode.abs() % 10000;
+  return n.toString().padLeft(4, '0');
+}
+
+/// Decorative EMV chip — the small gold rectangle on a physical card.
+/// Purely visual, sized to read correctly at both the small horizontal
+/// preview tiles and the full ATM-style hero card.
+class AtmChip extends StatelessWidget {
+  const AtmChip({super.key, this.width = 34, this.height = 25});
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(width * 0.16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF6E3A1), Color(0xFFC9A344), Color(0xFFF6E3A1)],
+        ),
+        border: Border.all(color: Colors.black.withOpacity(0.08)),
+      ),
+      child: CustomPaint(painter: _ChipLinesPainter()),
+    );
+  }
+}
+
+/// Thin engraved-looking lines across [AtmChip] to sell the "metal
+/// contact chip" read instead of a flat gold rounded rect.
+class _ChipLinesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.black.withOpacity(0.14)
+      ..strokeWidth = 0.8;
+    final midY = size.height / 2;
+    canvas.drawLine(Offset(0, midY), Offset(size.width, midY), paint);
+    canvas.drawLine(Offset(size.width * 0.34, 0), Offset(size.width * 0.34, size.height), paint);
+    canvas.drawLine(Offset(size.width * 0.66, 0), Offset(size.width * 0.66, size.height), paint);
+    final rectPaint = Paint()
+      ..color = Colors.black.withOpacity(0.10)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width * 0.14, size.height * 0.18, size.width * 0.72, size.height * 0.64),
+        Radius.circular(size.height * 0.18),
+      ),
+      rectPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChipLinesPainter oldDelegate) => false;
+}
+
+/// Rotated wifi glyph used as a stand-in for the contactless-payment
+/// "sound wave" mark printed on tap-to-pay bank/e-wallet cards.
+class AtmContactlessIcon extends StatelessWidget {
+  const AtmContactlessIcon({super.key, this.color = Colors.white, this.size = 20});
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: 1.5708, // 90deg, radians
+      child: Icon(Icons.wifi_rounded, color: color, size: size),
+    );
+  }
+}
+
+/// Small monospaced "masked PAN" row — e.g. •••• •••• •••• 4821 — shared
+/// by the ATM hero card and the compact horizontal card-wallet tiles.
+class MaskedCardNumber extends StatelessWidget {
+  const MaskedCardNumber({
+    super.key,
+    required this.lastFour,
+    this.color = Colors.white,
+    this.fontSize = 16,
+    this.compact = false,
+  });
+
+  final String lastFour;
+  final Color color;
+  final double fontSize;
+  /// Compact mode collapses to a single leading dot-group ("•••• 4821")
+  /// for tight spaces like the small horizontal preview cards.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = compact ? ['••••', lastFour] : ['••••', '••••', '••••', lastFour];
+    return Text(
+      groups.join('  '),
+      style: TextStyle(
+        color: color,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 2.2,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+  }
 }
 
 /// Brand-flavored gradients for card wallets, so BDO/GCash/UnionBank/Maya

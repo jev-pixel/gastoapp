@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -93,40 +95,135 @@ Widget build(BuildContext context) {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     children: [
-                    Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: style!.gradient,
-                            ),
+                    AspectRatio(
+                      aspectRatio: 1.586, // standard ID-1 bank card ratio
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: style!.gradient,
                           ),
-                                            padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          boxShadow: [
+                            BoxShadow(
+                              color: style.gradient.first.withOpacity(0.35),
+                              blurRadius: 26,
+                              offset: const Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            // Faint corner watermark of the provider's initial,
+                            // the way physical bank cards print a ghost logo.
+                            Positioned(
+                              right: -10,
+                              bottom: -26,
+                              child: Text(
+                                wallet.provider.substring(0, 1).toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 140,
+                                  fontWeight: FontWeight.w900,
+                                  color: style.textColor.withOpacity(0.08),
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(wallet.provider.toUpperCase(),
-                                      style: TextStyle(color: style.subTextColor, fontSize: 12, fontWeight: FontWeight.w700)),
-                                  // little chip accent, mirrors the balance bento card
-                                  Container(
-                                    width: 30, height: 21,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(5),
-                                      color: style.accent.withOpacity(0.85),
-                                    ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        wallet.provider.toUpperCase(),
+                                        style: TextStyle(
+                                          color: style.subTextColor,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                      AtmContactlessIcon(color: style.textColor.withOpacity(0.85)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const AtmChip(),
+                                  const Spacer(),
+                                  MaskedCardNumber(
+                                    lastFour: maskedCardDigits(wallet.id),
+                                    color: style.textColor.withOpacity(0.92),
+                                    fontSize: 17,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'CARD LABEL',
+                                              style: TextStyle(
+                                                color: style.subTextColor,
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.8,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              wallet.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: style.textColor,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            'BALANCE',
+                                            style: TextStyle(
+                                              color: style.subTextColor,
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _currency.format(wallet.currentBalance),
+                                            style: TextStyle(
+                                              color: style.textColor,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w800,
+                                              fontFeatures: const [FontFeature.tabularFigures()],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              Text(_currency.format(wallet.currentBalance),
-                                  style: TextStyle(color: style.textColor, fontSize: 30, fontWeight: FontWeight.w800)),
-                            ],
-                          ),
+                            ),
+                            GlassSheen(radius: BorderRadius.circular(22)),
+                          ],
                         ),
+                      ),
+                    ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -165,14 +262,37 @@ Widget build(BuildContext context) {
                           child: Center(child: Text('No transactions yet.', style: TextStyle(color: WalletPalette.textMuted))),
                         )
                       else
-                        ...transactions.map((t) => Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                title: Text(t.type.label),
-                                subtitle: Text(t.description ?? DateFormat.yMMMd().add_jm().format(t.createdAt)),
-                                trailing: Text(_currency.format(t.amount), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ...transactions.map((t) {
+                          final isCredit = t.type == WalletTransactionType.cardAllowance ||
+                              (t.type == WalletTransactionType.transfer && t.toCardWalletId == wallet.id);
+                          final tint = isCredit ? WalletPalette.primaryStart : WalletPalette.danger;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.92),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: WalletPalette.glassBorder),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
+                              ],
+                            ),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: tint.withOpacity(0.14),
+                                child: Icon(
+                                  isCredit ? Icons.add_rounded : Icons.remove_rounded,
+                                  color: tint,
+                                ),
                               ),
-                            )),
+                              title: Text(t.type.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              subtitle: Text(t.description ?? DateFormat.yMMMd().add_jm().format(t.createdAt)),
+                              trailing: Text(
+                                _currency.format(t.amount),
+                                style: TextStyle(fontWeight: FontWeight.bold, color: tint),
+                              ),
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ],
