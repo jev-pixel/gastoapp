@@ -15,10 +15,14 @@ class QrScannerSheet extends StatefulWidget {
 
 class _QrScannerSheetState extends State<QrScannerSheet> {
   bool _handled = false;
+  final MobileScannerController _controller = MobileScannerController();
 
-  // TODO: replace with real EMVCo/QR Ph payload parsing. Stub format
-  // assumed for now: "provider|amount|merchant|account".
-  // Flag for whoever owns the QR Ph payload spec.
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Map<String, String>? _parse(String raw) {
     final parts = raw.split('|');
     if (parts.length < 2) return null;
@@ -67,7 +71,36 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Scan to Pay')),
-      body: MobileScanner(onDetect: _onDetect),
+      body: MobileScanner(
+        controller: _controller,
+        onDetect: _onDetect,
+        // Surfaces the real reason the camera preview isn't showing
+        // instead of the generic "!" placeholder icon.
+              errorBuilder: (context, error, child) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.no_photography_rounded, color: Colors.white70, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Camera unavailable:\n${error.errorDetails?.message ?? error.errorCode.name}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Go Back'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      ),
     );
   }
 }

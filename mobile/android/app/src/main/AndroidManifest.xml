@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
         android:label="mobile"
@@ -32,5 +35,13 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Lets canLaunchUrl() correctly detect installed bank/e-wallet apps
+             on Android 11+ (API 30+), which otherwise hides package
+             visibility by default — needed for the BankDeepLinkService
+             hand-off to work reliably. -->
+        <package android:name="com.globe.gcash.android" />
+        <package android:name="com.paymaya" />
+        <package android:name="com.unionbankph.online" />
+        <package android:name="com.bdo.pay" />
     </queries>
 </manifest>
