@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -64,7 +62,8 @@ Widget build(BuildContext context) {
     final transactions = provider.transactionsByWallet[widget.cardWalletId] ?? const [];
     final style = wallet != null ? CardProviderPalette.of(wallet.provider) : null;
 
-    return Scaffold(
+    return WalletFontScope(
+      child: Scaffold(
       backgroundColor: WalletPalette.canvasBottom,
       appBar: AppBar(
         title: Text(wallet?.name ?? 'Card Wallet'),
@@ -91,11 +90,18 @@ Widget build(BuildContext context) {
             : Stack(
                 children: [
                   const Positioned.fill(child: WalletAmbientBackground()),
-                  ListView(
+                  WalletResponsivePage(
+                  child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     children: [
-                    AspectRatio(
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: WalletBreakpoints.isTablet(context) ? 420 : double.infinity,
+                        ),
+                        child: AspectRatio(
                       aspectRatio: 1.586, // standard ID-1 bank card ratio
                       child: Container(
                         decoration: BoxDecoration(
@@ -224,6 +230,8 @@ Widget build(BuildContext context) {
                         ),
                       ),
                     ),
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -295,9 +303,11 @@ Widget build(BuildContext context) {
                         }),
                     ],
                   ),
+                  ),
                 ],
               ),
       ),
+    ),
     );
   }
 }

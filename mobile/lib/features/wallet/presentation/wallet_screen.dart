@@ -121,7 +121,8 @@ class _WalletScreenState extends State<WalletScreen> {
     final pendingFixedDues =
         wallet.transactions.where((t) => !t.isPaid && t.dueDate != null).toList();
 
-    return Scaffold(
+    return WalletFontScope(
+      child: Scaffold(
       backgroundColor: WalletPalette.canvasBottom,
       appBar: AppBar(
         elevation: 0,
@@ -223,9 +224,12 @@ class _WalletScreenState extends State<WalletScreen> {
                         context.read<WalletProvider>().loadSummary(),
                         context.read<WalletProvider>().loadTransactions(),
                       ]),
+                      child: WalletResponsivePage(
                       child: ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                        padding: EdgeInsets.fromLTRB(
+                          16, 12, 16, WalletBreakpoints.isTablet(context) ? 40 : 24,
+                        ),
                         children: [
                           // -----------------------------------------------
                           // Bento dashboard row: balance widget + calendar
@@ -303,11 +307,11 @@ const SizedBox(height: 24),
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: summary.allowances.length,
                               gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: WalletBreakpoints.gridColumns(context),
                                 mainAxisSpacing: 12,
                                 crossAxisSpacing: 12,
-                                childAspectRatio: 1.35,
+                                childAspectRatio: WalletBreakpoints.isTablet(context) ? 1.5 : 1.35,
                               ),
                               itemBuilder: (context, index) => _AllowanceCard(
                                 allowance: summary.allowances[index],
@@ -337,6 +341,7 @@ const SizedBox(height: 24),
                                       style: TextStyle(color: WalletPalette.textMuted, fontSize: 12.5)),
                                 );
                               }
+                              final tileWidth = WalletBreakpoints.isTablet(context) ? 192.0 : 168.0;
                               return SizedBox(
                                 height: 118,
                                 child: ListView.separated(
@@ -350,7 +355,7 @@ const SizedBox(height: 24),
                                     return GestureDetector(
                                       onTap: () => _openCardWallet(c.id),
                                       child: Container(
-                                        width: 168,
+                                        width: tileWidth,
                                         decoration: BoxDecoration(
                                           borderRadius: cardRadius,
                                           gradient: LinearGradient(
@@ -426,9 +431,11 @@ const SizedBox(height: 24),
                             ),
                         ],
                       ),
+                      ),
                     ),
         ],
       ),
+    ),
     );
   }
 }

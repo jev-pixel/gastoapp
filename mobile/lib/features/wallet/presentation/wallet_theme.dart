@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 // ---------------------------------------------------------------------------
 // Wallet design system — "premium macOS" direction.
@@ -12,6 +13,17 @@ import 'package:flutter/material.dart';
 // deep ink-green as the primary "card" gradient (an Apple Wallet-style
 // card, not a flat brand color), and a single reusable diagonal glass
 // sheen used on every gradient tile so the lighting stays consistent.
+//
+// Two things were added on top of the original system:
+//   1. Typography — Inter (via google_fonts), the closest free match to
+//      San Francisco's metrics/spacing, applied app-wide through
+//      [WalletFontScope] so no screen has to hand-pick a font family.
+//   2. Responsiveness — [WalletBreakpoints] + [WalletResponsivePage] give
+//      every screen a shared, centered, max-width reading column on
+//      tablet/desktop instead of phone-width content stretched edge to
+//      edge, and [WalletSheetShell] turns into a centered floating panel
+//      (macOS "form sheet" style) above the tablet breakpoint instead of
+//      a full-bleed bottom sheet.
 //
 // Import this file instead of redefining a local _Palette / local sheet
 // input widgets per-file — that's what made the four bottom sheets drift
@@ -27,6 +39,7 @@ class WalletPalette {
 
   // Glass surfaces
   static const glassFill = Color(0xF7FFFFFF);
+  static const glassFillStrong = Color(0xFAFFFFFF);
   static const glassBorder = Color(0x14101A16);
   static const hairline = Color(0x111C2B22);
 
@@ -85,6 +98,107 @@ class WalletPalette {
     [Color(0xFFE9C765), Color(0xFFB98A16)], // amber/gold
     [Color(0xFFA597F5), Color(0xFF6C5CE7)], // purple
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Typography — Inter everywhere via a single DefaultTextStyle scope, so
+// individual screens/sheets keep their existing TextStyle(...) calls
+// (weight, size, color) and only the font family + baseline metrics are
+// centralized here. Explicit fields on a Text's own style always win over
+// this scope, so nothing downstream needs to change its color/weight.
+// ---------------------------------------------------------------------------
+
+/// Wrap any screen/sheet root in this once to make every descendant `Text`
+/// render in Inter with sane baseline color/height, without having to touch
+/// each individual TextStyle. If the app's MaterialApp already sets
+/// `theme: ThemeData(textTheme: GoogleFonts.interTextTheme())`, this is a
+/// harmless no-op layered on top — kept here so this feature reads
+/// correctly even before that global change lands.
+class WalletFontScope extends StatelessWidget {
+  const WalletFontScope({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTextStyle(
+      style: GoogleFonts.inter(
+        color: WalletPalette.ink,
+        fontSize: 14,
+        height: 1.32,
+        letterSpacing: -0.1,
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Convenience for wiring Inter into a top-level `MaterialApp(theme: ...)`
+/// once that becomes available — matches [WalletFontScope]'s metrics.
+ThemeData walletThemeData({Brightness brightness = Brightness.light}) {
+  final base = ThemeData(brightness: brightness, useMaterial3: true);
+  return base.copyWith(textTheme: GoogleFonts.interTextTheme(base.textTheme));
+}
+
+// ---------------------------------------------------------------------------
+// Responsiveness — three breakpoints (phone / tablet / desktop). Every
+// screen reads its column count and content width from here so the whole
+// feature scales consistently instead of each screen inventing its own
+// thresholds.
+// ---------------------------------------------------------------------------
+
+class WalletBreakpoints {
+  WalletBreakpoints._();
+
+  static const double tablet = 700;
+  static const double desktop = 1100;
+
+  static bool isTablet(BuildContext context) => MediaQuery.sizeOf(context).width >= tablet;
+  static bool isDesktop(BuildContext context) => MediaQuery.sizeOf(context).width >= desktop;
+
+  /// Column count for card-style grids (allowances, etc.) — 2 up on
+  /// phone, 3 on tablet, 4 on desktop-width windows.
+  static int gridColumns(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= desktop) return 4;
+    if (width >= tablet) return 3;
+    return 2;
+  }
+
+  /// Max width for a screen's main reading column. Phones get the full
+  /// width; tablet/desktop get a capped, centered column so text and
+  /// cards don't stretch into unreadable full-bleed rows — the same
+  /// instinct behind macOS windows keeping a comfortable content width
+  /// even when the window is wide.
+  static double contentMaxWidth(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= desktop) return 1040;
+    if (width >= tablet) return 760;
+    return width;
+  }
+}
+
+/// Centers [child] in a max-width column per [WalletBreakpoints], and
+/// applies [WalletFontScope]. Wrap the scrollable body of every wallet
+/// screen in this — it's a no-op on phone widths (max width == screen
+/// width) and gives tablet/desktop a proper reading column.
+class WalletResponsivePage extends StatelessWidget {
+  const WalletResponsivePage({super.key, required this.child, this.maxWidth});
+  final Widget child;
+  final double? maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedMaxWidth = maxWidth ?? WalletBreakpoints.contentMaxWidth(context);
+    return WalletFontScope(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: resolvedMaxWidth),
+          child: child,
+        ),
+      ),
+    );
+  }
 }
 
 /// Derives a stable pseudo card number's last 4 digits from any seed
@@ -190,10 +304,10 @@ class MaskedCardNumber extends StatelessWidget {
     final groups = compact ? ['••••', lastFour] : ['••••', '••••', '••••', lastFour];
     return Text(
       groups.join('  '),
-      style: TextStyle(
+      style: GoogleFonts.robotoMono(
         color: color,
         fontSize: fontSize,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w600,
         letterSpacing: 2.2,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
@@ -266,15 +380,19 @@ class CardProviderPalette {
     }
   }
 }
+
 /// Soft ambient color glow behind scaffold content — the same trick macOS
 /// uses under widgets and Control Center: barely-visible tinted blobs,
 /// heavily blurred, that never compete with foreground content. Sits as
-/// the first child of a body [Stack].
+/// the first child of a body [Stack]. Gains a fourth blob on wide windows
+/// so the effect still reads across a desktop-width canvas instead of
+/// pooling in one corner.
 class WalletAmbientBackground extends StatelessWidget {
   const WalletAmbientBackground({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isWide = WalletBreakpoints.isTablet(context);
     return IgnorePointer(
       child: Stack(
         children: [
@@ -290,6 +408,8 @@ class WalletAmbientBackground extends StatelessWidget {
           Positioned(top: -70, right: -60, child: _blob(220, WalletPalette.primaryEnd.withOpacity(0.10))),
           Positioned(top: 240, left: -90, child: _blob(260, WalletPalette.accentBlueEnd.withOpacity(0.09))),
           Positioned(bottom: -100, right: -30, child: _blob(240, WalletPalette.tealEnd.withOpacity(0.08))),
+          if (isWide)
+            Positioned(bottom: 60, left: 120, child: _blob(200, WalletPalette.amberEnd.withOpacity(0.05))),
         ],
       ),
     );
@@ -456,26 +576,30 @@ class SheetHeader extends StatelessWidget {
     required this.icon,
     this.iconBg = const Color(0xFFE1F5E0),
     this.iconFg = WalletPalette.primaryStart,
+    this.subtitle,
   });
 
   final String title;
   final IconData icon;
   final Color iconBg;
   final Color iconFg;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
+    final isWide = WalletBreakpoints.isTablet(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: Container(
-            width: 36,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(color: WalletPalette.hairline, borderRadius: BorderRadius.circular(4)),
+        if (!isWide)
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(color: WalletPalette.hairline, borderRadius: BorderRadius.circular(4)),
+            ),
           ),
-        ),
         Row(
           children: [
             Container(
@@ -484,13 +608,28 @@ class SheetHeader extends StatelessWidget {
               child: Icon(icon, color: iconFg, size: 20),
             ),
             const SizedBox(width: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-                color: WalletPalette.ink,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: WalletPalette.ink,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        subtitle!,
+                        style: const TextStyle(fontSize: 12, color: WalletPalette.textMuted),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
@@ -654,21 +793,45 @@ class SheetPrimaryButton extends StatelessWidget {
 
 /// Bottom-sheet outer shell — frosted-glass rounded top, consistent
 /// padding + keyboard inset handling, shared by every wallet sheet.
+///
+/// Responsive behavior: on phone widths this stays a full-width bottom
+/// sheet with only the top corners rounded, same as before. At/above
+/// [WalletBreakpoints.tablet] it becomes a centered, all-corners-rounded
+/// floating panel capped at [maxWidth] — the macOS/iPadOS "form sheet"
+/// treatment, so a compact form doesn't stretch across a whole tablet or
+/// desktop-width window.
 class WalletSheetShell extends StatelessWidget {
-  const WalletSheetShell({super.key, required this.child});
+  const WalletSheetShell({super.key, required this.child, this.maxWidth = 480});
   final Widget child;
+  final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+    final isWide = WalletBreakpoints.isTablet(context);
+    final radius = isWide
+        ? BorderRadius.circular(28)
+        : const BorderRadius.vertical(top: Radius.circular(26));
+
+    final glass = ClipRRect(
+      borderRadius: radius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: WalletPalette.glassFill,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
-            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.6))),
+            borderRadius: radius,
+            border: isWide
+                ? Border.all(color: Colors.white.withOpacity(0.6))
+                : Border(top: BorderSide(color: Colors.white.withOpacity(0.6))),
+            boxShadow: isWide
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.20),
+                      blurRadius: 48,
+                      offset: const Offset(0, 24),
+                    ),
+                  ]
+                : null,
           ),
           child: Padding(
             padding: EdgeInsets.only(
@@ -678,6 +841,20 @@ class WalletSheetShell extends StatelessWidget {
               bottom: MediaQuery.of(context).viewInsets.bottom + 24,
             ),
             child: child,
+          ),
+        ),
+      ),
+    );
+
+    if (!isWide) return WalletFontScope(child: glass);
+
+    return WalletFontScope(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: glass,
           ),
         ),
       ),

@@ -69,7 +69,8 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
   Widget build(BuildContext context) {
     final transactions = context.watch<WalletProvider>().transactions;
 
-    return Scaffold(
+    return WalletFontScope(
+      child: Scaffold(
       backgroundColor: WalletPalette.canvasBottom,
       appBar: AppBar(
         elevation: 0,
@@ -110,6 +111,7 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                   child: Text('No transactions yet.', style: TextStyle(color: WalletPalette.textMuted)))
               : RefreshIndicator(
                   onRefresh: () => context.read<WalletProvider>().loadTransactions(),
+                  child: WalletResponsivePage(
                   child: ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
@@ -121,9 +123,11 @@ class _WalletHistoryScreenState extends State<WalletHistoryScreen> {
                       onPay: () => _handlePay(transactions[index]),
                     ),
                   ),
+                  ),
                 ),
         ],
       ),
+    ),
     );
   }
 }

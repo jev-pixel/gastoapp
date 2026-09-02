@@ -1,12 +1,10 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// A row of tappable PIN boxes backed by a single hidden [TextField].
-///
-/// Using one hidden field (instead of four separate controllers/FocusNodes,
-/// the classic OTP-box pattern) sidesteps the usual fiddly auto-advance /
-/// backspace-across-boxes bugs — the OS keyboard and text editing just work
-/// as normal, and the boxes are purely a visual reflection of its value.
+import 'glass_theme.dart';
+
 class PinInputField extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final ValueChanged<String>? onCompleted;
@@ -36,8 +34,6 @@ class PinInputFieldState extends State<PinInputField> {
   @override
   void initState() {
     super.initState();
-    // Focus changes affect which box is highlighted as "active", so they
-    // need to trigger a rebuild even though the text itself didn't change.
     _focusNode.addListener(() => setState(() {}));
   }
 
@@ -48,8 +44,6 @@ class PinInputFieldState extends State<PinInputField> {
     super.dispose();
   }
 
-  /// Wipes the entered digits — handy after a failed login attempt so the
-  /// person isn't stuck editing four dots that no longer mean anything.
   void clear() {
     _controller.clear();
     widget.onChanged('');
@@ -74,29 +68,63 @@ class PinInputFieldState extends State<PinInputField> {
                 children: List.generate(widget.length, (i) {
                   final filled = i < digits.length;
                   final isActive = i == digits.length && _focusNode.hasFocus;
-                  return Container(
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOut,
                     width: 56,
                     height: 60,
                     margin: const EdgeInsets.symmetric(horizontal: 6),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: widget.hasError
-                            ? const Color(0xFFD9534F)
-                            : isActive
-                                ? const Color(0xFF0F5132)
-                                : const Color(0xFFE7ECE6),
-                        width: isActive || widget.hasError ? 1.8 : 1.2,
-                      ),
-                    ),
-                    child: Text(
-                      filled ? (widget.obscure ? '●' : digits[i]) : '',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF14231C),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.white.withOpacity(filled || isActive ? 0.85 : 0.55),
+                            border: Border.all(
+                              color: widget.hasError
+                                  ? LightGlassTheme.danger
+                                  : isActive
+                                      ? LightGlassTheme.brightGold
+                                      : LightGlassTheme.subtleBorder,
+                              width: isActive || widget.hasError ? 1.8 : 1.2,
+                            ),
+                            boxShadow: (isActive && !widget.hasError)
+                                ? [
+                                    BoxShadow(
+                                      color: LightGlassTheme.brightGold.withOpacity(0.32),
+                                      blurRadius: 16,
+                                      spreadRadius: -2,
+                                    ),
+                                  ]
+                                : widget.hasError
+                                    ? [
+                                        BoxShadow(
+                                          color: LightGlassTheme.danger.withOpacity(0.24),
+                                          blurRadius: 14,
+                                          spreadRadius: -2,
+                                        ),
+                                      ]
+                                    : [
+                                        BoxShadow(
+                                          color: LightGlassTheme.forestGreen.withOpacity(0.04),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                          ),
+                          child: Text(
+                            filled ? (widget.obscure ? '●' : digits[i]) : '',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: LightGlassTheme.textPrimary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -104,8 +132,6 @@ class PinInputFieldState extends State<PinInputField> {
               );
             },
           ),
-          // The actual input surface — invisible, 1x1, but focusable and
-          // keyboard-driven like any other text field.
           Positioned.fill(
             child: Opacity(
               opacity: 0,

@@ -3,9 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'auth_provider.dart';
+import 'glass_theme.dart';
 
-/// Formats a numeric text field with thousands separators as the user types,
-/// e.g. "12000" -> "12,000". Keeps the stored value digit-only for parsing.
 class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
@@ -79,7 +78,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
 
@@ -95,11 +93,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     if (user == null || !_initialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: LightGlassTheme.canvasBackground,
+        body: Center(child: CircularProgressIndicator(color: LightGlassTheme.forestGreen)),
+      );
     }
 
-    // Surface backend errors as a snackbar rather than a static, easy-to-miss
-    // line of red text, and only once per new error.
     if (auth.errorMessage != null && auth.errorMessage != _lastShownError) {
       _lastShownError = auth.errorMessage;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -109,7 +108,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ..showSnackBar(
             SnackBar(
               content: Text(auth.errorMessage!),
-              backgroundColor: theme.colorScheme.error,
+              backgroundColor: LightGlassTheme.danger,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -120,163 +119,266 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surfaceContainerLowest,
+      backgroundColor: LightGlassTheme.canvasBackground,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Edit Profile'),
-        centerTitle: false,
-        scrolledUnderElevation: 1,
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-            children: [
-              // --- Avatar + name preview -------------------------------
-              Center(
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Text(
-                        _initials(_nameController.text.isEmpty
-                            ? user.fullName
-                            : _nameController.text),
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Update your personal and financial details',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              _SectionCard(
-                title: 'Personal information',
-                icon: Icons.person_outline,
-                children: [
-                  TextFormField(
-                    controller: _nameController,
-                    textInputAction: TextInputAction.next,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _fieldDecoration(
-                      label: 'Full name',
-                      icon: Icons.badge_outlined,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your full name';
-                      }
-                      return null;
-                    },
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              _SectionCard(
-                title: 'Financial details',
-                icon: Icons.account_balance_wallet_outlined,
-                children: [
-                  TextFormField(
-                    controller: _incomeController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: false),
-                    textInputAction: TextInputAction.next,
-                    inputFormatters: [_ThousandsSeparatorInputFormatter()],
-                    decoration: _fieldDecoration(
-                      label: 'Monthly income',
-                      icon: Icons.payments_outlined,
-                      prefixText: '₱ ',
-                    ),
-                    validator: (value) =>
-                        _validateAmount(value, fieldName: 'monthly income'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _savingsFloorController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: false),
-                    textInputAction: TextInputAction.next,
-                    inputFormatters: [_ThousandsSeparatorInputFormatter()],
-                    decoration: _fieldDecoration(
-                      label: 'Target savings floor',
-                      icon: Icons.savings_outlined,
-                      prefixText: '₱ ',
-                      helperText:
-                          'The minimum balance you want to always keep',
-                    ),
-                    validator: (value) => _validateAmount(value,
-                        fieldName: 'target savings floor'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _walletBalanceController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: false),
-                    textInputAction: TextInputAction.done,
-                    inputFormatters: [_ThousandsSeparatorInputFormatter()],
-                    decoration: _fieldDecoration(
-                      label: 'Current wallet balance',
-                      icon: Icons.account_balance_wallet_outlined,
-                      prefixText: '₱ ',
-                    ),
-                    validator: (value) => _validateAmount(value,
-                        fieldName: 'current wallet balance'),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: _submitting ? null : _submit,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                icon: _submitting
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.check),
-                label: Text(_submitting ? 'Saving…' : 'Save changes'),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: _submitting
-                      ? null
-                      : () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-              ),
-            ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: LightGlassTheme.textPrimary, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Edit Profile',
+          style: TextStyle(
+            color: LightGlassTheme.textPrimary,
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+            letterSpacing: -0.5,
           ),
         ),
+      ),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -60,
+            right: -60,
+            child: GlowBlob(
+              colors: [LightGlassTheme.brightGold, LightGlassTheme.darkGold],
+              size: 320,
+            ),
+          ),
+          Positioned(
+            bottom: -80,
+            left: -60,
+            child: GlowBlob(
+              colors: [LightGlassTheme.lighterGreen, LightGlassTheme.forestGreen],
+              size: 360,
+            ),
+          ),
+
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 580),
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    children: [
+                      LightGlassCard(
+                        padding: const EdgeInsets.all(28),
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [LightGlassTheme.brightGold, LightGlassTheme.darkGold],
+                                ),
+                              ),
+                              child: CircleAvatar(
+                                radius: 40,
+                                backgroundColor: LightGlassTheme.forestGreen,
+                                child: Text(
+                                  _initials(_nameController.text.isEmpty
+                                      ? user.fullName
+                                      : _nameController.text),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Personal & Financial Details',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: LightGlassTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Update your information synced across your devices',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: LightGlassTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      LightGlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _SectionHeader(
+                              icon: Icons.person_outline_rounded,
+                              title: 'Personal information',
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _nameController,
+                              style: const TextStyle(color: LightGlassTheme.textPrimary, fontWeight: FontWeight.w600),
+                              textInputAction: TextInputAction.next,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: _fieldDecoration(
+                                label: 'Full name',
+                                icon: Icons.badge_outlined,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter your full name';
+                                }
+                                return null;
+                              },
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      LightGlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _SectionHeader(
+                              icon: Icons.account_balance_wallet_outlined,
+                              title: 'Financial details',
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _incomeController,
+                              style: const TextStyle(color: LightGlassTheme.textPrimary, fontWeight: FontWeight.w600),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(decimal: false),
+                              textInputAction: TextInputAction.next,
+                              inputFormatters: [_ThousandsSeparatorInputFormatter()],
+                              decoration: _fieldDecoration(
+                                label: 'Monthly income',
+                                icon: Icons.payments_outlined,
+                                prefixText: '₱ ',
+                              ),
+                              validator: (value) =>
+                                  _validateAmount(value, fieldName: 'monthly income'),
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _savingsFloorController,
+                              style: const TextStyle(color: LightGlassTheme.textPrimary, fontWeight: FontWeight.w600),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(decimal: false),
+                              textInputAction: TextInputAction.next,
+                              inputFormatters: [_ThousandsSeparatorInputFormatter()],
+                              decoration: _fieldDecoration(
+                                label: 'Target savings floor',
+                                icon: Icons.savings_outlined,
+                                prefixText: '₱ ',
+                                helperText:
+                                    'The minimum balance you want to always keep',
+                              ),
+                              validator: (value) => _validateAmount(value,
+                                  fieldName: 'target savings floor'),
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _walletBalanceController,
+                              style: const TextStyle(color: LightGlassTheme.textPrimary, fontWeight: FontWeight.w600),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(decimal: false),
+                              textInputAction: TextInputAction.done,
+                              inputFormatters: [_ThousandsSeparatorInputFormatter()],
+                              decoration: _fieldDecoration(
+                                label: 'Current wallet balance',
+                                icon: Icons.account_balance_wallet_outlined,
+                                prefixText: '₱ ',
+                              ),
+                              validator: (value) => _validateAmount(value,
+                                  fieldName: 'current wallet balance'),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 28),
+                      Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            colors: [LightGlassTheme.forestGreen, LightGlassTheme.lighterGreen],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: LightGlassTheme.forestGreen.withOpacity(0.25),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: _submitting ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          icon: _submitting
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle_outline_rounded, color: LightGlassTheme.brightGold),
+                          label: Text(
+                            _submitting ? 'Saving…' : 'Save changes',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: TextButton(
+                          onPressed: _submitting
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: LightGlassTheme.textMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -289,12 +391,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon),
+      labelStyle: const TextStyle(color: LightGlassTheme.textMuted, fontSize: 13.5),
+      prefixIcon: Icon(icon, color: LightGlassTheme.forestGreen, size: 20),
       prefixText: prefixText,
+      prefixStyle: const TextStyle(color: LightGlassTheme.forestGreen, fontWeight: FontWeight.bold),
       helperText: helperText,
+      helperStyle: const TextStyle(color: LightGlassTheme.textMuted),
       helperMaxLines: 2,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       filled: true,
+      fillColor: Colors.white.withOpacity(0.75),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: LightGlassTheme.subtleBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: LightGlassTheme.forestGreen, width: 1.6),
+      ),
     );
   }
 
@@ -353,50 +467,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 }
 
-/// A titled card wrapper used to visually group related form fields.
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.children,
-  });
-
-  final String title;
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.icon, required this.title});
   final IconData icon;
-  final List<Widget> children;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...children,
-          ],
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: LightGlassTheme.forestGreen.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: LightGlassTheme.forestGreen),
         ),
-      ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: LightGlassTheme.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }
