@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/api_client.dart';
 import '../data/card_wallet_repository.dart';
 import '../domain/card_wallet_model.dart';
+import '../domain/qr_model.dart';
 import '../domain/wallet_model.dart';
 
 const _uuid = Uuid();
@@ -16,6 +17,7 @@ class CardWalletProvider extends ChangeNotifier {
   final Map<String, List<WalletTransactionEntry>> transactionsByWallet = {};
   bool isLoading = false;
   String? errorMessage;
+  QrReservation? activeReservation;
 
   CardWallet? byId(String id) {
     for (final w in cardWallets) {
@@ -138,6 +140,55 @@ class CardWalletProvider extends ChangeNotifier {
       errorMessage = e.message;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<QrReservation?> reserveQr({
+    required String cardWalletId,
+    required double amount,
+    required String provider,
+    String? merchantName,
+    String? destinationAccount,
+    String? rawPayload,
+  }) async {
+    try {
+      activeReservation = await _repository.reserveQrPayment(
+        cardWalletId: cardWalletId,
+        amount: amount,
+        provider: provider,
+        merchantName: merchantName,
+        destinationAccount: destinationAccount,
+        rawPayload: rawPayload,
+      );
+      notifyListeners();
+      return activeReservation;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> confirmQrSettlement(String reservationId) async {
+    try {
+      await _repository.settleQrPayment(reservationId);
+      activeReservation = null;
+      await loadCardWallets();
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> cancelQrReservation(String reservationId) async {
+    try {
+      await _repository.cancelQrPayment(reservationId);
+    } finally {
+      activeReservation = null;
+      notifyListeners();
     }
   }
 }

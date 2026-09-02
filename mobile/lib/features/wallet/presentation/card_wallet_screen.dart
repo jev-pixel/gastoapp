@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/bank_deeplink_service.dart';
+import '../domain/qr_model.dart';
 import '../domain/wallet_model.dart';
 import 'card_action_sheet.dart';
 import 'card_transfer_sheet.dart';
 import 'card_wallet_provider.dart';
+import 'qr_confirm_settlement_sheet.dart';
+import 'qr_generator_sheet.dart';
+import 'qr_scanner_sheet.dart';
 import 'wallet_theme.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
@@ -40,6 +45,32 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => CardActionSheet(cardWalletId: widget.cardWalletId, isSpend: isSpend),
+    );
+  }
+
+  Future<void> _openScanner(BuildContext context) async {
+    final reservation = await Navigator.of(context).push<QrReservation>(
+      MaterialPageRoute(
+        builder: (_) => QrScannerSheet(cardWalletId: widget.cardWalletId),
+      ),
+    );
+    if (reservation == null || !mounted) return;
+
+    await BankDeepLinkService.stageAndLaunch(
+      provider: reservation.provider,
+      clipboardText:
+          '${reservation.destinationAccount ?? ''} ${reservation.amount.toStringAsFixed(2)}',
+    );
+    if (!mounted) return;
+
+    // Give the user a way to confirm once they've completed the payment
+    // in their banking app.
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false, // force an explicit confirm/cancel choice
+      builder: (_) => QrConfirmSettlementSheet(reservation: reservation),
     );
   }
 
@@ -260,6 +291,31 @@ Widget build(BuildContext context) {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _openScanner(context),
+                              icon: const Icon(Icons.qr_code_scanner_rounded),
+                              label: const Text('Scan'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => QrGeneratorSheet(wallet: wallet),
+                              ),
+                              icon: const Icon(Icons.qr_code_2_rounded),
+                              label: const Text('Receive'),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 24),
                       const Text('Recent Transactions',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -308,6 +364,95 @@ Widget build(BuildContext context) {
               ),
       ),
     ),
+    );
+  }
+}
+
+/// Shown after the bank app has been launched for a staged QR payment.
+/// Lets the user confirm the payment was completed, or cancel the
+/// reservation if they backed out.
+class _QrConfirmSheet extends StatefulWidget {
+  final QrReservation reservation;
+  const _QrConfirmSheet({required this.reservation});
+
+  @override
+  State<_QrConfirmSheet> createState() => _QrConfirmSheetState();
+}
+
+class _QrConfirmSheetState extends State<_QrConfirmSheet> {
+  bool _submitting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return WalletSheetShell(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SheetHeader(
+            title: 'Confirm Payment',
+            icon: Icons.check_circle_outline_rounded,
+            iconBg: Color(0xFFDFF3E3),
+            iconFg: Color(0xFF1B7A3D),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Sent ${_currency.format(widget.reservation.amount)} via '
+            '${widget.reservation.provider.toUpperCase()}? Mark it as sent once '
+            'you\'ve completed it in your banking app.',
+            style: const TextStyle(color: WalletPalette.textMuted, fontSize: 13.5),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _submitting
+                      ? null
+                      : () async {
+                          await context
+                              .read<CardWalletProvider>()
+                              .cancelQrReservation(widget.reservation.id);
+                          if (mounted) Navigator.of(context).pop();
+                        },
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _submitting
+                      ? null
+                      : () async {
+                          setState(() => _submitting = true);
+                          final ok = await context
+                              .read<CardWalletProvider>()
+                              .confirmQrSettlement(widget.reservation.id);
+                          if (!mounted) return;
+                          if (ok) {
+                            Navigator.of(context).pop();
+                          } else {
+                            setState(() => _submitting = false);
+                            final err = context.read<CardWalletProvider>().errorMessage;
+                            if (err != null) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(content: Text(err)));
+                            }
+                          }
+                        },
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Mark as Sent'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

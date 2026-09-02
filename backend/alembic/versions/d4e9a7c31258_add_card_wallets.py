@@ -1,4 +1,4 @@
-"""add card wallets and card wallet transaction columns
+﻿"""add card wallets and card wallet transaction columns
 
 Revision ID: d4e9a7c31258
 Revises: c3d8f2a91b47
@@ -45,4 +45,4 @@ def downgrade() -> None:
     op.drop_column('wallet_transactions', 'from_card_wallet_id')
     op.drop_column('wallet_transactions', 'card_wallet_id')
     op.drop_table('card_wallets')
-    # Postgres can't drop enum values cleanly — left in place on downgrade.
+    # Postgres can't drop enum values cleanly - left in place on downgrade.

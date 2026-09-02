@@ -1,6 +1,7 @@
 import '../../../core/api_client.dart';
 import '../domain/card_wallet_model.dart';
 import '../domain/wallet_model.dart';
+import '../domain/qr_model.dart';
 
 class CardWalletRepository {
   final ApiClient _api;
@@ -80,4 +81,34 @@ class CardWalletRepository {
     });
     return WalletTransactionEntry.fromJson(json);
   }
+
+  Future<QrReservation> reserveQrPayment({
+  required String cardWalletId,
+  required double amount,
+  required String provider,
+  String? merchantName,
+  String? destinationAccount,
+  String? rawPayload,
+}) async {
+  final json = await _api.post('/wallet/qr/reserve', {
+    'card_wallet_id': cardWalletId,
+    'amount': amount,
+    'provider': provider,
+    'merchant_name': merchantName,
+    'destination_account': destinationAccount,
+    'raw_payload': rawPayload,
+  });
+  return QrReservation.fromJson(json);
+}
+
+Future<QrReservation> settleQrPayment(String reservationId) async {
+  final json = await _api.post('/wallet/qr/$reservationId/settle', {});
+  return QrReservation.fromJson(json);
+}
+
+Future<QrReservation> cancelQrPayment(String reservationId) async {
+  final json = await _api.post('/wallet/qr/$reservationId/cancel', {});
+  return QrReservation.fromJson(json);
+}
+
 }
