@@ -15,7 +15,16 @@ class QrScannerSheet extends StatefulWidget {
 
 class _QrScannerSheetState extends State<QrScannerSheet> {
   bool _handled = false;
-  final MobileScannerController _controller = MobileScannerController();
+  final MobileScannerController _controller = MobileScannerController(
+    autoStart: false,
+    detectionSpeed: DetectionSpeed.noDuplicates,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _controller.start());
+  }
 
   @override
   void dispose() {
@@ -77,7 +86,7 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
         // Surfaces the real reason the camera preview isn't showing
         // instead of the generic "!" placeholder icon.
               errorBuilder: (context, error, child) {
-        return Center(
+          return Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
