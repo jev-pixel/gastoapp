@@ -18,11 +18,19 @@ class QrConfirmSettlementSheet extends StatefulWidget {
   State<QrConfirmSettlementSheet> createState() => _QrConfirmSettlementSheetState();
 }
 
-class _QrConfirmSettlementSheetState extends State<QrConfirmSettlementSheet> {
+class _QrConfirmSettlementSheetState extends State<QrConfirmSettlementSheet>
+    with SingleTickerProviderStateMixin {
   Timer? _ticker;
   Duration _remaining = Duration.zero;
   bool _confirming = false;
   bool _cancelling = false;
+
+  // Slow breathing pulse on the countdown chip — a quiet "this is live"
+  // cue instead of a static badge, dialed back once time actually runs low.
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
 
   @override
   void initState() {
@@ -42,6 +50,7 @@ class _QrConfirmSettlementSheetState extends State<QrConfirmSettlementSheet> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -103,6 +112,7 @@ class _QrConfirmSettlementSheetState extends State<QrConfirmSettlementSheet> {
     final r = widget.reservation;
     final expired = _remaining == Duration.zero;
     final busy = _confirming || _cancelling;
+    final urgent = !expired && _remaining.inSeconds <= 30;
 
     return WalletSheetShell(
       child: Column(
@@ -115,85 +125,146 @@ class _QrConfirmSettlementSheetState extends State<QrConfirmSettlementSheet> {
             iconBg: Color(0xFFFFF2C2),
             iconFg: Color(0xFFB98A16),
           ),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: WalletPalette.glassBorder),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      r.merchantName?.isNotEmpty == true ? r.merchantName! : r.provider.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: WalletPalette.ink),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (expired ? WalletPalette.danger : WalletPalette.amberStart).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _countdownLabel,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: expired ? WalletPalette.danger : WalletPalette.amberStart,
+          FadeSlideIn(
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: WalletPalette.glassBorder),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 8)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          r.merchantName?.isNotEmpty == true ? r.merchantName! : r.provider.toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: WalletPalette.ink),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      _CountdownChip(
+                        label: _countdownLabel,
+                        expired: expired,
+                        urgent: urgent,
+                        pulse: _pulseController,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _currency.format(r.amount),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: WalletPalette.ink),
+                  ),
+                  if (r.destinationAccount?.isNotEmpty == true) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'To: ${r.destinationAccount}',
+                      style: const TextStyle(color: WalletPalette.textMuted, fontSize: 12.5),
                     ),
                   ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _currency.format(r.amount),
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: WalletPalette.ink),
-                ),
-                if (r.destinationAccount?.isNotEmpty == true) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'To: ${r.destinationAccount}',
-                    style: const TextStyle(color: WalletPalette.textMuted, fontSize: 12.5),
-                  ),
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 14),
-          Text(
-            expired
-                ? "This reservation expired and the hold on your funds has been released. You'll need to scan again."
-                : "We've opened ${r.provider} and staged the details on your clipboard. Once you've sent the payment there, confirm it below so your card wallet balance updates.",
-            style: const TextStyle(fontSize: 12.5, color: WalletPalette.textMuted, height: 1.4),
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 60),
+            child: AnimatedSwitcher(
+              duration: WalletMotion.standard,
+              switchInCurve: WalletMotion.settle,
+              child: Text(
+                expired
+                    ? "This reservation expired and the hold on your funds has been released. You'll need to scan again."
+                    : "We've opened ${r.provider} and staged the details on your clipboard. Once you've sent the payment there, confirm it below so your card wallet balance updates.",
+                key: ValueKey(expired),
+                style: const TextStyle(fontSize: 12.5, color: WalletPalette.textMuted, height: 1.4),
+              ),
+            ),
           ),
           const SizedBox(height: 22),
-          SheetPrimaryButton(
-            label: 'I Completed the Payment',
-            loading: _confirming,
-            onTap: (expired || busy) ? null : _confirmSettlement,
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 110),
+            child: SheetPrimaryButton(
+              label: 'I Completed the Payment',
+              loading: _confirming,
+              onTap: (expired || busy) ? null : _confirmSettlement,
+            ),
           ),
           const SizedBox(height: 10),
-          if (!expired)
-            TextButton.icon(
-              onPressed: busy ? null : _cancelReservation,
-              icon: const Icon(Icons.close_rounded, size: 18),
-              label: Text(_cancelling ? 'Cancelling…' : "Didn't go through — Cancel"),
-              style: TextButton.styleFrom(
-                foregroundColor: WalletPalette.danger,
-                textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-              ),
-            )
-          else
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Close'),
-            ),
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 140),
+            child: !expired
+                ? TextButton.icon(
+                    onPressed: busy ? null : _cancelReservation,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: Text(_cancelling ? 'Cancelling…' : "Didn't go through — Cancel"),
+                    style: TextButton.styleFrom(
+                      foregroundColor: WalletPalette.danger,
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Close'),
+                  ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Countdown pill with a quiet breathing pulse while time remains, and a
+/// smooth color hand-off (amber → red → done) instead of an instant swap.
+class _CountdownChip extends StatelessWidget {
+  const _CountdownChip({
+    required this.label,
+    required this.expired,
+    required this.urgent,
+    required this.pulse,
+  });
+
+  final String label;
+  final bool expired;
+  final bool urgent;
+  final Animation<double> pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = expired
+        ? WalletPalette.danger
+        : urgent
+            ? WalletPalette.danger
+            : WalletPalette.amberStart;
+
+    return AnimatedBuilder(
+      animation: pulse,
+      builder: (context, child) {
+        // Only breathe while there's still time and it isn't urgent yet —
+        // once it's urgent the color carries the tension instead.
+        final scale = (!expired && !urgent) ? 1.0 + (pulse.value * 0.05) : 1.0;
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: AnimatedContainer(
+        duration: WalletMotion.standard,
+        curve: WalletMotion.settle,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: AnimatedDefaultTextStyle(
+          duration: WalletMotion.standard,
+          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: color),
+          child: Text(label),
+        ),
       ),
     );
   }

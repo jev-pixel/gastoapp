@@ -40,18 +40,28 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
   }
 
   void _openAction(bool isSpend) {
-    showModalBottomSheet(
+    showWalletSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => CardActionSheet(cardWalletId: widget.cardWalletId, isSpend: isSpend),
     );
   }
 
   Future<void> _openScanner(BuildContext context) async {
     final reservation = await Navigator.of(context).push<QrReservation>(
-      MaterialPageRoute(
-        builder: (_) => QrScannerSheet(cardWalletId: widget.cardWalletId),
+      PageRouteBuilder(
+        opaque: true,
+        transitionDuration: WalletMotion.standard,
+        reverseTransitionDuration: WalletMotion.standard,
+        pageBuilder: (_, __, ___) => QrScannerSheet(cardWalletId: widget.cardWalletId),
+        // A soft fade+scale for the camera page instead of a hard material
+        // slide — reads closer to how iOS presents a full-screen scanner.
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(parent: animation, curve: WalletMotion.settle);
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
+          );
+        },
       ),
     );
     if (reservation == null || !mounted) return;
@@ -65,20 +75,16 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
 
     // Give the user a way to confirm once they've completed the payment
     // in their banking app.
-    showModalBottomSheet(
+    showWalletSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       isDismissible: false, // force an explicit confirm/cancel choice
       builder: (_) => QrConfirmSettlementSheet(reservation: reservation),
     );
   }
 
   void _openTransfer(CardWalletProvider provider) {
-    showModalBottomSheet(
+    showWalletSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => CardTransferSheet(
         cardWallets: provider.cardWallets,
         initialCardWalletId: widget.cardWalletId,
@@ -86,8 +92,15 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
     );
   }
 
+  void _openReceive(CardWallet wallet) {
+    showWalletSheet(
+      context: context,
+      builder: (_) => QrGeneratorSheet(wallet: wallet),
+    );
+  }
+
   @override
-Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
     final provider = context.watch<CardWalletProvider>();
     final wallet = provider.byId(widget.cardWalletId);
     final transactions = provider.transactionsByWallet[widget.cardWalletId] ?? const [];
@@ -95,363 +108,293 @@ Widget build(BuildContext context) {
 
     return WalletFontScope(
       child: Scaffold(
-      backgroundColor: WalletPalette.canvasBottom,
-      appBar: AppBar(
-        title: Text(wallet?.name ?? 'Card Wallet'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'Back to Wallet Dashboard',
-          onPressed: () => Navigator.of(context).pop(),
+        backgroundColor: WalletPalette.canvasBottom,
+        appBar: AppBar(
+          title: Text(wallet?.name ?? 'Card Wallet'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Back to Wallet Dashboard',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          final cardProvider = context.read<CardWalletProvider>();
-          await cardProvider.loadCardWallets();
-          await cardProvider.loadTransactions(widget.cardWalletId);
-        },
-        child: wallet == null
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
-                  SizedBox(height: 160),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              )
-            : Stack(
-                children: [
-                  const Positioned.fill(child: WalletAmbientBackground()),
-                  WalletResponsivePage(
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    children: [
-                    Align(
-                      alignment: Alignment.topCenter,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: WalletBreakpoints.isTablet(context) ? 420 : double.infinity,
-                        ),
-                        child: AspectRatio(
-                      aspectRatio: 1.586, // standard ID-1 bank card ratio
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: style!.gradient,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: style.gradient.first.withOpacity(0.35),
-                              blurRadius: 26,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
-                        ),
-                        child: Stack(
-                          children: [
-                            // Faint corner watermark of the provider's initial,
-                            // the way physical bank cards print a ghost logo.
-                            Positioned(
-                              right: -10,
-                              bottom: -26,
-                              child: Text(
-                                wallet.provider.substring(0, 1).toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 140,
-                                  fontWeight: FontWeight.w900,
-                                  color: style.textColor.withOpacity(0.08),
-                                  height: 1,
+        body: RefreshIndicator(
+          onRefresh: () async {
+            final cardProvider = context.read<CardWalletProvider>();
+            await cardProvider.loadCardWallets();
+            await cardProvider.loadTransactions(widget.cardWalletId);
+          },
+          child: wallet == null
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 160),
+                    Center(child: CircularProgressIndicator()),
+                  ],
+                )
+              : Stack(
+                  children: [
+                    const Positioned.fill(child: WalletAmbientBackground()),
+                    WalletResponsivePage(
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        children: [
+                          FadeSlideIn(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: WalletBreakpoints.isTablet(context) ? 420 : double.infinity,
+                                ),
+                                child: AspectRatio(
+                                  aspectRatio: 1.586, // standard ID-1 bank card ratio
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(22),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: style!.gradient,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: style.gradient.first.withOpacity(0.35),
+                                          blurRadius: 26,
+                                          offset: const Offset(0, 14),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Stack(
+                                      children: [
+                                        // Faint corner watermark of the provider's initial,
+                                        // the way physical bank cards print a ghost logo.
+                                        Positioned(
+                                          right: -10,
+                                          bottom: -26,
+                                          child: Text(
+                                            wallet.provider.substring(0, 1).toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 140,
+                                              fontWeight: FontWeight.w900,
+                                              color: style.textColor.withOpacity(0.08),
+                                              height: 1,
+                                            ),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    wallet.provider.toUpperCase(),
+                                                    style: TextStyle(
+                                                      color: style.subTextColor,
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w800,
+                                                      letterSpacing: 1.2,
+                                                    ),
+                                                  ),
+                                                  AtmContactlessIcon(color: style.textColor.withOpacity(0.85)),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 14),
+                                              const AtmChip(),
+                                              const Spacer(),
+                                              MaskedCardNumber(
+                                                lastFour: maskedCardDigits(wallet.id),
+                                                color: style.textColor.withOpacity(0.92),
+                                                fontSize: 17,
+                                              ),
+                                              const SizedBox(height: 14),
+                                              Row(
+                                                crossAxisAlignment: CrossAxisAlignment.end,
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          'CARD LABEL',
+                                                          style: TextStyle(
+                                                            color: style.subTextColor,
+                                                            fontSize: 9.5,
+                                                            fontWeight: FontWeight.w700,
+                                                            letterSpacing: 0.8,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          wallet.name,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: TextStyle(
+                                                            color: style.textColor,
+                                                            fontSize: 14,
+                                                            fontWeight: FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                                    children: [
+                                                      Text(
+                                                        'BALANCE',
+                                                        style: TextStyle(
+                                                          color: style.subTextColor,
+                                                          fontSize: 9.5,
+                                                          fontWeight: FontWeight.w700,
+                                                          letterSpacing: 0.8,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        _currency.format(wallet.currentBalance),
+                                                        style: TextStyle(
+                                                          color: style.textColor,
+                                                          fontSize: 20,
+                                                          fontWeight: FontWeight.w800,
+                                                          fontFeatures: const [FontFeature.tabularFigures()],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        GlassSheen(radius: BorderRadius.circular(22)),
+                                        // One-shot light sweep played once when the card
+                                        // first appears — the Apple Wallet "wake up" beat.
+                                        OneShotSheen(radius: BorderRadius.circular(22)),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        wallet.provider.toUpperCase(),
-                                        style: TextStyle(
-                                          color: style.subTextColor,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
-                                      AtmContactlessIcon(color: style.textColor.withOpacity(0.85)),
-                                    ],
+                          ),
+                          const SizedBox(height: 18),
+                          FadeSlideIn(
+                            delay: const Duration(milliseconds: 70),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: WalletToolbarAction(
+                                    icon: Icons.add_rounded,
+                                    label: 'Add',
+                                    tint: WalletPalette.primaryEnd,
+                                    onTap: () => _openAction(false),
                                   ),
-                                  const SizedBox(height: 14),
-                                  const AtmChip(),
-                                  const Spacer(),
-                                  MaskedCardNumber(
-                                    lastFour: maskedCardDigits(wallet.id),
-                                    color: style.textColor.withOpacity(0.92),
-                                    fontSize: 17,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: WalletToolbarAction(
+                                    icon: Icons.remove_rounded,
+                                    label: 'Spend',
+                                    tint: WalletPalette.danger,
+                                    onTap: () => _openAction(true),
                                   ),
-                                  const SizedBox(height: 14),
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'CARD LABEL',
-                                              style: TextStyle(
-                                                color: style.subTextColor,
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.w700,
-                                                letterSpacing: 0.8,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              wallet.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: style.textColor,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            'BALANCE',
-                                            style: TextStyle(
-                                              color: style.subTextColor,
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: 0.8,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            _currency.format(wallet.currentBalance),
-                                            style: TextStyle(
-                                              color: style.textColor,
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w800,
-                                              fontFeatures: const [FontFeature.tabularFigures()],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: WalletToolbarAction(
+                                    icon: Icons.swap_horiz_rounded,
+                                    label: 'Transfer',
+                                    tint: WalletPalette.accentBlueStart,
+                                    onTap: () => _openTransfer(provider),
                                   ),
-                                ],
-                              ),
-                            ),
-                            GlassSheen(radius: BorderRadius.circular(22)),
-                          ],
-                        ),
-                      ),
-                    ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _openAction(false),
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Add'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _openAction(true),
-                              icon: const Icon(Icons.remove_rounded),
-                              label: const Text('Spend'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _openTransfer(provider),
-                              icon: const Icon(Icons.swap_horiz_rounded),
-                              label: const Text('Transfer'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _openScanner(context),
-                              icon: const Icon(Icons.qr_code_scanner_rounded),
-                              label: const Text('Scan'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => QrGeneratorSheet(wallet: wallet),
-                              ),
-                              icon: const Icon(Icons.qr_code_2_rounded),
-                              label: const Text('Receive'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const Text('Recent Transactions',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 10),
-                      if (transactions.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(child: Text('No transactions yet.', style: TextStyle(color: WalletPalette.textMuted))),
-                        )
-                      else
-                        ...transactions.map((t) {
-                          final isCredit = t.type == WalletTransactionType.cardAllowance ||
-                              (t.type == WalletTransactionType.transfer && t.toCardWalletId == wallet.id);
-                          final tint = isCredit ? WalletPalette.primaryStart : WalletPalette.danger;
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.92),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: WalletPalette.glassBorder),
-                              boxShadow: [
-                                BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: WalletToolbarAction(
+                                    icon: Icons.qr_code_scanner_rounded,
+                                    label: 'Scan',
+                                    tint: WalletPalette.tealStart,
+                                    onTap: () => _openScanner(context),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: WalletToolbarAction(
+                                    icon: Icons.qr_code_2_rounded,
+                                    label: 'Receive',
+                                    tint: WalletPalette.amberStart,
+                                    onTap: () => _openReceive(wallet),
+                                  ),
+                                ),
                               ],
                             ),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: tint.withOpacity(0.14),
-                                child: Icon(
-                                  isCredit ? Icons.add_rounded : Icons.remove_rounded,
-                                  color: tint,
+                          ),
+                          const SizedBox(height: 26),
+                          FadeSlideIn(
+                            delay: const Duration(milliseconds: 110),
+                            child: const Text('Recent Transactions',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                          ),
+                          const SizedBox(height: 10),
+                          if (transactions.isEmpty)
+                            FadeSlideIn(
+                              delay: const Duration(milliseconds: 140),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: Text('No transactions yet.', style: TextStyle(color: WalletPalette.textMuted)),
                                 ),
                               ),
-                              title: Text(t.type.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                              subtitle: Text(t.description ?? DateFormat.yMMMd().add_jm().format(t.createdAt)),
-                              trailing: Text(
-                                _currency.format(t.amount),
-                                style: TextStyle(fontWeight: FontWeight.bold, color: tint),
-                              ),
-                            ),
-                          );
-                        }),
-                    ],
-                  ),
-                  ),
-                ],
-              ),
-      ),
-    ),
-    );
-  }
-}
-
-/// Shown after the bank app has been launched for a staged QR payment.
-/// Lets the user confirm the payment was completed, or cancel the
-/// reservation if they backed out.
-class _QrConfirmSheet extends StatefulWidget {
-  final QrReservation reservation;
-  const _QrConfirmSheet({required this.reservation});
-
-  @override
-  State<_QrConfirmSheet> createState() => _QrConfirmSheetState();
-}
-
-class _QrConfirmSheetState extends State<_QrConfirmSheet> {
-  bool _submitting = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return WalletSheetShell(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SheetHeader(
-            title: 'Confirm Payment',
-            icon: Icons.check_circle_outline_rounded,
-            iconBg: Color(0xFFDFF3E3),
-            iconFg: Color(0xFF1B7A3D),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Sent ${_currency.format(widget.reservation.amount)} via '
-            '${widget.reservation.provider.toUpperCase()}? Mark it as sent once '
-            'you\'ve completed it in your banking app.',
-            style: const TextStyle(color: WalletPalette.textMuted, fontSize: 13.5),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _submitting
-                      ? null
-                      : () async {
-                          await context
-                              .read<CardWalletProvider>()
-                              .cancelQrReservation(widget.reservation.id);
-                          if (mounted) Navigator.of(context).pop();
-                        },
-                  child: const Text('Cancel'),
+                            )
+                          else
+                            ...transactions.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final t = entry.value;
+                              final isCredit = t.type == WalletTransactionType.cardAllowance ||
+                                  (t.type == WalletTransactionType.transfer && t.toCardWalletId == wallet.id);
+                              final tint = isCredit ? WalletPalette.primaryStart : WalletPalette.danger;
+                              return FadeSlideIn(
+                                // Cap the stagger so a long history doesn't leave the
+                                // last rows waiting several seconds to appear.
+                                delay: Duration(milliseconds: 140 + (index.clamp(0, 8) * 28)),
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.92),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: WalletPalette.glassBorder),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
+                                    ],
+                                  ),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: tint.withOpacity(0.14),
+                                      child: Icon(
+                                        isCredit ? Icons.add_rounded : Icons.remove_rounded,
+                                        color: tint,
+                                      ),
+                                    ),
+                                    title: Text(t.type.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                    subtitle: Text(t.description ?? DateFormat.yMMMd().add_jm().format(t.createdAt)),
+                                    trailing: Text(
+                                      _currency.format(t.amount),
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: tint),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _submitting
-                      ? null
-                      : () async {
-                          setState(() => _submitting = true);
-                          final ok = await context
-                              .read<CardWalletProvider>()
-                              .confirmQrSettlement(widget.reservation.id);
-                          if (!mounted) return;
-                          if (ok) {
-                            Navigator.of(context).pop();
-                          } else {
-                            setState(() => _submitting = false);
-                            final err = context.read<CardWalletProvider>().errorMessage;
-                            if (err != null) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(content: Text(err)));
-                            }
-                          }
-                        },
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Mark as Sent'),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

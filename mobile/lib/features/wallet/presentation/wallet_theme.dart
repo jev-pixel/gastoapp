@@ -861,3 +861,261 @@ class WalletSheetShell extends StatelessWidget {
     );
   }
 }
+// ---------------------------------------------------------------------------
+// Motion — "Premium Touch" pass. Shared curves/durations + a few reusable
+// animated primitives so transitions stay consistent across every sheet
+// and screen instead of each file picking its own timing by feel. This is
+// additive on top of everything above — nothing existing changes shape.
+// ---------------------------------------------------------------------------
+
+class WalletMotion {
+  WalletMotion._();
+
+  static const Duration quick = Duration(milliseconds: 180);
+  static const Duration standard = Duration(milliseconds: 340);
+  static const Duration slow = Duration(milliseconds: 560);
+
+  /// Fast start, soft landing — the way macOS sheets and springboard
+  /// icons ease in, instead of a linear or symmetric ease.
+  static const Curve settle = Curves.easeOutCubic;
+
+  /// A touch of overshoot for things that should feel "alive" (success
+  /// states, sheet entrances) without going full bouncy/elastic.
+  static const Curve pop = Curves.easeOutBack;
+}
+
+/// Scales [child] down slightly on press and springs back on release —
+/// the tactile "give" every tappable surface has on macOS/iOS, instead of
+/// Material's flat ripple-only feedback. Wrap buttons, cards, list tiles.
+class PressableScale extends StatefulWidget {
+  const PressableScale({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.scaleDown = 0.96,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scaleDown;
+
+  @override
+  State<PressableScale> createState() => _PressableScaleState();
+}
+
+class _PressableScaleState extends State<PressableScale> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: WalletMotion.quick,
+  );
+
+  void _setPressed(bool pressed) {
+    if (widget.onTap == null) return;
+    pressed ? _controller.forward() : _controller.reverse();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final scale = 1 - (_controller.value * (1 - widget.scaleDown));
+          return Transform.scale(scale: scale, child: child);
+        },
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Fades + slides [child] up into place once, with an optional [delay] —
+/// used to stagger list entrances (transaction rows, action tiles)
+/// instead of everything popping in on the same frame.
+class FadeSlideIn extends StatelessWidget {
+  const FadeSlideIn({super.key, required this.child, this.delay = Duration.zero, this.offset = 14});
+
+  final Widget child;
+  final Duration delay;
+  final double offset;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = WalletMotion.standard + delay;
+    final delayFraction = (delay.inMilliseconds / total.inMilliseconds).clamp(0.0, 0.9);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: total,
+      curve: Interval(delayFraction, 1.0, curve: WalletMotion.settle),
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(offset: Offset(0, offset * (1 - t)), child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// A one-shot diagonal light sweep played once on mount — the little
+/// "wake up" shimmer Apple Wallet/Card plays when a card first appears.
+/// Purely decorative; sits above [GlassSheen], never intercepts taps.
+class OneShotSheen extends StatefulWidget {
+  const OneShotSheen({super.key, required this.radius, this.delay = const Duration(milliseconds: 120)});
+  final BorderRadius radius;
+  final Duration delay;
+
+  @override
+  State<OneShotSheen> createState() => _OneShotSheenState();
+}
+
+class _OneShotSheenState extends State<OneShotSheen> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ClipRRect(
+          borderRadius: widget.radius,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final t = Curves.easeInOutCubic.transform(_controller.value);
+              return FractionalTranslation(
+                translation: Offset(-1.6 + t * 3.2, -1.6 + t * 3.2),
+                child: Transform.rotate(
+                  angle: -0.6,
+                  child: Container(
+                    width: 160,
+                    height: 520,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withOpacity(0),
+                          Colors.white.withOpacity(0.16),
+                          Colors.white.withOpacity(0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact glass "toolbar" action tile — icon over a short label, used
+/// for the row of card actions (Add / Spend / Transfer / Scan / Receive)
+/// instead of stock [OutlinedButton]s, so the row reads like a macOS
+/// toolbar segment rather than a row of form buttons.
+class WalletToolbarAction extends StatelessWidget {
+  const WalletToolbarAction({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.tint = WalletPalette.primaryEnd,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: WalletPalette.glassBorder),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: tint),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: WalletPalette.ink.withOpacity(0.85)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Presents [builder] as a bottom sheet with a soft scale + slide + fade
+/// entrance instead of Flutter's default linear slide-up — the "form
+/// sheet" pop macOS/iPadOS uses. Drop-in replacement for
+/// [showModalBottomSheet] for every wallet sheet; [WalletSheetShell]
+/// still owns width/keyboard/tablet-centering behavior underneath.
+Future<T?> showWalletSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isDismissible = true,
+}) {
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: isDismissible,
+    barrierLabel: 'Dismiss',
+    barrierColor: Colors.black.withOpacity(0.32),
+    transitionDuration: WalletMotion.standard,
+    pageBuilder: (context, _, __) => Align(alignment: Alignment.bottomCenter, child: builder(context)),
+    transitionBuilder: (context, animation, _, child) {
+      final curved = CurvedAnimation(parent: animation, curve: WalletMotion.settle);
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(curved),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
+            alignment: Alignment.bottomCenter,
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
