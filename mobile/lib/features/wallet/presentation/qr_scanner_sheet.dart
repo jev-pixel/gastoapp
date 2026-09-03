@@ -171,10 +171,16 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
                     ),
                     Row(
                       children: [
-                        ValueListenableBuilder<TorchState>(
-                          valueListenable: _controller.torchState,
-                          builder: (context, torch, _) => _GlassCircleButton(
-                            icon: torch == TorchState.on ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                        // mobile_scanner v5+ dropped the standalone
+                        // `controller.torchState` ValueListenable — torch
+                        // state now lives on `controller.value`, and the
+                        // controller itself is the ValueListenable.
+                        ValueListenableBuilder<MobileScannerState>(
+                          valueListenable: _controller,
+                          builder: (context, state, _) => _GlassCircleButton(
+                            icon: state.torchState == TorchState.on
+                                ? Icons.flash_on_rounded
+                                : Icons.flash_off_rounded,
                             onTap: () => _controller.toggleTorch(),
                           ),
                         ),
@@ -208,9 +214,9 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.12),
+                        color: Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.18)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                       ),
                       child: const Text(
                         'Align the QR code within the frame',
@@ -251,9 +257,9 @@ class _GlassCircleButton extends StatelessWidget {
             height: 40,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.14),
+              color: Colors.white.withValues(alpha: 0.14),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.18)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
             ),
             child: Icon(icon, color: Colors.white, size: 19),
           ),
@@ -320,14 +326,14 @@ class _ViewfinderPainter extends CustomPainter {
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
       ..addRRect(rrect)
       ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(scrimPath, Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawPath(scrimPath, Paint()..color = Colors.black.withValues(alpha: 0.55));
 
     final accent = success ? const Color(0xFF3FD17A) : Colors.white;
 
     canvas.drawRRect(
       rrect,
       Paint()
-        ..color = accent.withOpacity(success ? 0.9 : 0.55)
+        ..color = accent.withValues(alpha: success ? 0.9 : 0.55)
         ..style = PaintingStyle.stroke
         ..strokeWidth = success ? 3 : 1.4,
     );
@@ -356,14 +362,14 @@ class _ViewfinderPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.transparent, accent.withOpacity(0.55), Colors.transparent],
+          colors: [Colors.transparent, accent.withValues(alpha: 0.55), Colors.transparent],
         ).createShader(lineRect);
       canvas.drawRect(lineRect, glow);
       canvas.drawLine(
         Offset(rect.left + 8, lineY),
         Offset(rect.right - 8, lineY),
         Paint()
-          ..color = accent.withOpacity(0.9)
+          ..color = accent.withValues(alpha: 0.9)
           ..strokeWidth = 2,
       );
     } else {

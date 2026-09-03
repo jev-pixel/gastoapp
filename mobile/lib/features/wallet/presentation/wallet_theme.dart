@@ -229,7 +229,7 @@ class AtmChip extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFFF6E3A1), Color(0xFFC9A344), Color(0xFFF6E3A1)],
         ),
-        border: Border.all(color: Colors.black.withOpacity(0.08)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
       ),
       child: CustomPaint(painter: _ChipLinesPainter()),
     );
@@ -242,14 +242,14 @@ class _ChipLinesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.black.withOpacity(0.14)
+      ..color = Colors.black.withValues(alpha: 0.14)
       ..strokeWidth = 0.8;
     final midY = size.height / 2;
     canvas.drawLine(Offset(0, midY), Offset(size.width, midY), paint);
     canvas.drawLine(Offset(size.width * 0.34, 0), Offset(size.width * 0.34, size.height), paint);
     canvas.drawLine(Offset(size.width * 0.66, 0), Offset(size.width * 0.66, size.height), paint);
     final rectPaint = Paint()
-      ..color = Colors.black.withOpacity(0.10)
+      ..color = Colors.black.withValues(alpha: 0.10)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
     canvas.drawRRect(
@@ -405,11 +405,11 @@ class WalletAmbientBackground extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(top: -70, right: -60, child: _blob(220, WalletPalette.primaryEnd.withOpacity(0.10))),
-          Positioned(top: 240, left: -90, child: _blob(260, WalletPalette.accentBlueEnd.withOpacity(0.09))),
-          Positioned(bottom: -100, right: -30, child: _blob(240, WalletPalette.tealEnd.withOpacity(0.08))),
+          Positioned(top: -70, right: -60, child: _blob(220, WalletPalette.primaryEnd.withValues(alpha: 0.10))),
+          Positioned(top: 240, left: -90, child: _blob(260, WalletPalette.accentBlueEnd.withValues(alpha: 0.09))),
+          Positioned(bottom: -100, right: -30, child: _blob(240, WalletPalette.tealEnd.withValues(alpha: 0.08))),
           if (isWide)
-            Positioned(bottom: 60, left: 120, child: _blob(200, WalletPalette.amberEnd.withOpacity(0.05))),
+            Positioned(bottom: 60, left: 120, child: _blob(200, WalletPalette.amberEnd.withValues(alpha: 0.05))),
         ],
       ),
     );
@@ -493,7 +493,7 @@ class GlassSheen extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Colors.white.withOpacity(0.24), Colors.white.withOpacity(0.0)],
+                        colors: [Colors.white.withValues(alpha: 0.24), Colors.white.withValues(alpha: 0.0)],
                       ),
                     ),
                   ),
@@ -509,7 +509,7 @@ class GlassSheen extends StatelessWidget {
                       gradient: RadialGradient(
                         center: Alignment.bottomRight,
                         radius: 1.1,
-                        colors: [Colors.black.withOpacity(0.10), Colors.black.withOpacity(0.0)],
+                        colors: [Colors.black.withValues(alpha: 0.10), Colors.black.withValues(alpha: 0.0)],
                       ),
                     ),
                   ),
@@ -518,7 +518,7 @@ class GlassSheen extends StatelessWidget {
               DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: radius,
-                  border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
                 ),
               ),
             ],
@@ -548,7 +548,7 @@ class GlassIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final button = Material(
-      color: Colors.white.withOpacity(0.7),
+      color: Colors.white.withValues(alpha: 0.7),
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -765,7 +765,7 @@ class SheetPrimaryButton extends StatelessWidget {
           color: disabled ? WalletPalette.hairline : null,
           boxShadow: disabled
               ? null
-              : [BoxShadow(color: colors.first.withOpacity(0.30), blurRadius: 18, offset: const Offset(0, 9))],
+              : [BoxShadow(color: colors.first.withValues(alpha: 0.30), blurRadius: 18, offset: const Offset(0, 9))],
         ),
         child: Material(
           color: Colors.transparent,
@@ -821,12 +821,12 @@ class WalletSheetShell extends StatelessWidget {
             color: WalletPalette.glassFill,
             borderRadius: radius,
             border: isWide
-                ? Border.all(color: Colors.white.withOpacity(0.6))
-                : Border(top: BorderSide(color: Colors.white.withOpacity(0.6))),
+                ? Border.all(color: Colors.white.withValues(alpha: 0.6))
+                : Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.6))),
             boxShadow: isWide
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.20),
+                      color: Colors.black.withValues(alpha: 0.20),
                       blurRadius: 48,
                       offset: const Offset(0, 24),
                     ),
@@ -1021,9 +1021,9 @@ class _OneShotSheenState extends State<OneShotSheen> with SingleTickerProviderSt
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.white.withOpacity(0),
-                          Colors.white.withOpacity(0.16),
-                          Colors.white.withOpacity(0),
+                          Colors.white.withValues(alpha: 0),
+                          Colors.white.withValues(alpha: 0.16),
+                          Colors.white.withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -1063,11 +1063,11 @@ class WalletToolbarAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.72),
+          color: Colors.white.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: WalletPalette.glassBorder),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
         child: Column(
@@ -1077,7 +1077,7 @@ class WalletToolbarAction extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               label,
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: WalletPalette.ink.withOpacity(0.85)),
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: WalletPalette.ink.withValues(alpha: 0.85)),
             ),
           ],
         ),
@@ -1100,7 +1100,7 @@ Future<T?> showWalletSheet<T>({
     context: context,
     barrierDismissible: isDismissible,
     barrierLabel: 'Dismiss',
-    barrierColor: Colors.black.withOpacity(0.32),
+    barrierColor: Colors.black.withValues(alpha: 0.32),
     transitionDuration: WalletMotion.standard,
     pageBuilder: (context, _, __) => Align(alignment: Alignment.bottomCenter, child: builder(context)),
     transitionBuilder: (context, animation, _, child) {

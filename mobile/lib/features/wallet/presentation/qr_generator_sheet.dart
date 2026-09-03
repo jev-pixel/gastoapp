@@ -69,8 +69,8 @@ class _QrGeneratorSheetState extends State<QrGeneratorSheet> {
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          WalletPalette.accentBlueEnd.withOpacity(0.10),
-                          WalletPalette.accentBlueEnd.withOpacity(0),
+                          WalletPalette.accentBlueEnd.withValues(alpha: 0.10),
+                          WalletPalette.accentBlueEnd.withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -85,7 +85,7 @@ class _QrGeneratorSheetState extends State<QrGeneratorSheet> {
                         border: Border.all(color: WalletPalette.glassBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 22,
                             offset: const Offset(0, 10),
                           ),

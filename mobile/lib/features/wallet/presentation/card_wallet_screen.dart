@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/bank_deeplink_service.dart';
+import '../domain/card_wallet_model.dart';
 import '../domain/qr_model.dart';
 import '../domain/wallet_model.dart';
 import 'card_action_sheet.dart';
@@ -46,16 +47,20 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
     );
   }
 
-  Future<void> _openScanner(BuildContext context) async {
+  // No BuildContext parameter here on purpose — taking one in as an
+  // argument shadows the State's own `context`, so the analyzer can no
+  // longer prove a later `mounted` check actually guards *that* context.
+  // Using the State's own `context` throughout keeps the guard verifiable.
+  Future<void> _openScanner() async {
     final reservation = await Navigator.of(context).push<QrReservation>(
       PageRouteBuilder(
         opaque: true,
         transitionDuration: WalletMotion.standard,
         reverseTransitionDuration: WalletMotion.standard,
-        pageBuilder: (_, __, ___) => QrScannerSheet(cardWalletId: widget.cardWalletId),
+        pageBuilder: (_, _, _) => QrScannerSheet(cardWalletId: widget.cardWalletId),
         // A soft fade+scale for the camera page instead of a hard material
         // slide — reads closer to how iOS presents a full-screen scanner.
-        transitionsBuilder: (_, animation, __, child) {
+        transitionsBuilder: (_, animation, _, child) {
           final curved = CurvedAnimation(parent: animation, curve: WalletMotion.settle);
           return FadeTransition(
             opacity: curved,
@@ -158,7 +163,7 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: style.gradient.first.withOpacity(0.35),
+                                          color: style.gradient.first.withValues(alpha: 0.35),
                                           blurRadius: 26,
                                           offset: const Offset(0, 14),
                                         ),
@@ -176,7 +181,7 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
                                             style: TextStyle(
                                               fontSize: 140,
                                               fontWeight: FontWeight.w900,
-                                              color: style.textColor.withOpacity(0.08),
+                                              color: style.textColor.withValues(alpha: 0.08),
                                               height: 1,
                                             ),
                                           ),
@@ -198,7 +203,7 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
                                                       letterSpacing: 1.2,
                                                     ),
                                                   ),
-                                                  AtmContactlessIcon(color: style.textColor.withOpacity(0.85)),
+                                                  AtmContactlessIcon(color: style.textColor.withValues(alpha: 0.85)),
                                                 ],
                                               ),
                                               const SizedBox(height: 14),
@@ -206,7 +211,7 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
                                               const Spacer(),
                                               MaskedCardNumber(
                                                 lastFour: maskedCardDigits(wallet.id),
-                                                color: style.textColor.withOpacity(0.92),
+                                                color: style.textColor.withValues(alpha: 0.92),
                                                 fontSize: 17,
                                               ),
                                               const SizedBox(height: 14),
@@ -318,7 +323,7 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
                                     icon: Icons.qr_code_scanner_rounded,
                                     label: 'Scan',
                                     tint: WalletPalette.tealStart,
-                                    onTap: () => _openScanner(context),
+                                    onTap: _openScanner,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -364,16 +369,16 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
                                 child: Container(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.92),
+                                    color: Colors.white.withValues(alpha: 0.92),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(color: WalletPalette.glassBorder),
                                     boxShadow: [
-                                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3)),
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
                                     ],
                                   ),
                                   child: ListTile(
                                     leading: CircleAvatar(
-                                      backgroundColor: tint.withOpacity(0.14),
+                                      backgroundColor: tint.withValues(alpha: 0.14),
                                       child: Icon(
                                         isCredit ? Icons.add_rounded : Icons.remove_rounded,
                                         color: tint,

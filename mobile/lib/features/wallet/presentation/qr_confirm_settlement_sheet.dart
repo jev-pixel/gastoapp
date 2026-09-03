@@ -133,7 +133,7 @@ class _QrConfirmSettlementSheetState extends State<QrConfirmSettlementSheet>
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: WalletPalette.glassBorder),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 8)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 8)),
                 ],
               ),
               child: Column(
@@ -257,7 +257,7 @@ class _CountdownChip extends StatelessWidget {
         curve: WalletMotion.settle,
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: AnimatedDefaultTextStyle(
