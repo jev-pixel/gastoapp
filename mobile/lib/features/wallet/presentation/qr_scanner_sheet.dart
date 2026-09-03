@@ -85,30 +85,30 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
         onDetect: _onDetect,
         // Surfaces the real reason the camera preview isn't showing
         // instead of the generic "!" placeholder icon.
-              errorBuilder: (context, error, child) {
+              errorBuilder: (context, error) {
           return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.no_photography_rounded, color: Colors.white70, size: 48),
-                const SizedBox(height: 16),
-                Text(
-                  'Camera unavailable:\n${error.errorDetails?.message ?? error.errorCode.name}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Go Back'),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.no_photography_rounded, color: Colors.white70, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Camera unavailable:\n${error.errorDetails?.message ?? error.errorCode.name}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Go Back'),
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
       ),
     );
   }
