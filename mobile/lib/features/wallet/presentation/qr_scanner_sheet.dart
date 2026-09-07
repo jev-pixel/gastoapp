@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../domain/qr_model.dart';
 import 'card_wallet_provider.dart';
+import 'qr_ph_parser.dart';
 import 'wallet_theme.dart';
 
 class QrScannerSheet extends StatefulWidget {
@@ -64,40 +65,61 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
     super.dispose();
   }
 
-  Map<String, String>? _parse(String raw) {
-    final parts = raw.split('|');
-    if (parts.length < 2) return null;
-    // Guard against a malformed/garbled amount segment too — a code that
-    // matches the pipe format but has a non-numeric amount would otherwise
-    // slip through here and only fail later at the API call.
-    if (double.tryParse(parts[1]) == null) return null;
-    return {
-      'provider': parts[0].toLowerCase(),
-      'amount': parts[1],
-      'merchant': parts.length > 2 ? parts[2] : '',
-      'account': parts.length > 3 ? parts[3] : '',
-    };
+  // Card wallets already carry a known provider (BDO/GCash/Maya/UnionBank/
+  // Other) — that's the source of truth for the deep link, never the QR
+  // content itself (the standard TLV doesn't reliably expose which app
+  // issued the code).
+  String _mapToBankProvider(String cardWalletProvider) {
+    switch (cardWalletProvider.toUpperCase()) {
+      case 'GCASH':
+        return 'gcash';
+      case 'MAYA':
+        return 'maya';
+      case 'UNIONBANK':
+        return 'unionbank';
+      case 'BDO':
+        return 'bdo';
+      default:
+        return 'other';
+    }
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_handled) return;
     final raw = capture.barcodes.firstOrNull?.rawValue;
     if (raw == null) return;
-    final parsed = _parse(raw);
-    if (parsed == null) {
-      // Previously this returned silently, so scanning any code that
-      // wasn't a GastoApp-generated payment QR looked exactly like the
-      // scanner "not working" — no error, no feedback, nothing visible
-      // happened. detectionSpeed.noDuplicates already de-dupes repeated
-      // reads of the same static code, so this won't spam the snackbar.
+
+    ParsedQrPh parsed;
+    try {
+      parsed = QrPhParser.parse(raw);
+    } on QrPhParseException {
+      // Previously any non-matching code returned silently, so scanning
+      // anything but a GastoApp test QR looked exactly like the scanner
+      // "not working" — no error, no feedback, nothing visible happened.
+      // detectionSpeed.noDuplicates already de-dupes repeated reads of the
+      // same static code, so this won't spam the snackbar.
       HapticFeedback.selectionClick();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("That QR code isn't a valid GastoApp payment code."),
+          content: Text("That doesn't look like a valid GCash/Maya/bank QR code."),
           duration: Duration(seconds: 2),
         ),
       );
       return;
+    }
+
+    // Static personal/merchant codes (the common case) carry no amount —
+    // that's normal, not an error. Ask the user before reserving.
+    double amount = parsed.amount ?? 0;
+    if (parsed.requiresManualAmount) {
+      _controller.stop(); // pause the camera while the user types
+      final entered = await _promptForAmount(parsed.merchantName);
+      if (!mounted) return;
+      if (entered == null) {
+        await _controller.start();
+        return; // user cancelled
+      }
+      amount = entered;
     }
 
     setState(() => _handled = true);
@@ -110,17 +132,24 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
     await Future.delayed(const Duration(milliseconds: 260));
     if (!mounted) return;
 
-    final amount = double.tryParse(parsed['amount']!) ?? 0;
-    final provider = parsed['provider']!;
+    final cardProvider = context.read<CardWalletProvider>();
+    final wallet = cardProvider.byId(widget.cardWalletId);
+    final bankProvider = _mapToBankProvider(wallet?.provider ?? 'Other');
 
-    final reservation = await context.read<CardWalletProvider>().reserveQr(
-          cardWalletId: widget.cardWalletId,
-          amount: amount,
-          provider: provider,
-          merchantName: parsed['merchant']!.isEmpty ? null : parsed['merchant'],
-          destinationAccount: parsed['account']!.isEmpty ? null : parsed['account'],
-          rawPayload: raw,
-        );
+    final reservation = await cardProvider.reserveQr(
+      cardWalletId: widget.cardWalletId,
+      amount: amount,
+      provider: bankProvider,
+      merchantName: parsed.merchantName,
+      // Not reliably extractable from the standard TLV — the actual
+      // settlement account lives in scheme-specific sub-fields of the
+      // nested Merchant Account Information templates (tags 26-51), which
+      // vary per participant GUID. destinationAccount is optional in the
+      // reservation schema, so this stays null and merchantName (tag 59,
+      // which IS standardized) carries the display info instead.
+      destinationAccount: null,
+      rawPayload: raw,
+    );
 
     if (!mounted) return;
     if (reservation == null) {
@@ -128,7 +157,8 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
         _handled = false;
         _success = false;
       });
-      final err = context.read<CardWalletProvider>().errorMessage;
+      await _controller.start();
+      final err = cardProvider.errorMessage;
       if (err != null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
       }
@@ -136,6 +166,35 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
     }
 
     Navigator.of(context).pop<QrReservation>(reservation);
+  }
+
+  Future<double?> _promptForAmount(String? merchantName) {
+    final controller = TextEditingController();
+    return showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          merchantName?.isNotEmpty == true ? 'Pay $merchantName' : 'Enter amount',
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(prefixText: '₱ '),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              final v = double.tryParse(controller.text);
+              Navigator.of(ctx).pop(v != null && v > 0 ? v : null);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
