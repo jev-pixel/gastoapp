@@ -31,6 +31,11 @@ class _QrGeneratorSheetState extends State<QrGeneratorSheet> {
   @override
   Widget build(BuildContext context) {
     final amount = double.tryParse(_amountController.text) ?? 0;
+    // The backend's QrReserveRequest requires amount > 0 (Field(gt=0)) —
+    // a QR generated with amount 0 would always fail to reserve when
+    // scanned, so we gate rendering on a valid amount instead of letting
+    // the user generate a code that's guaranteed to fail downstream.
+    final isValid = amount > 0;
     final payload = '${widget.wallet.provider.toLowerCase()}|$amount|${widget.wallet.name}|';
 
     return WalletSheetShell(
@@ -48,9 +53,17 @@ class _QrGeneratorSheetState extends State<QrGeneratorSheet> {
             child: SheetTextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
-              label: 'Amount (PHP) — optional',
+              label: 'Amount (PHP)',
               icon: Icons.payments_outlined,
               prefixText: '₱ ',
+            ),
+          ),
+          const SizedBox(height: 6),
+          FadeSlideIn(
+            child: Text(
+              'An amount is required — GastoApp reserves this amount in the '
+              "sender's wallet before they pay you.",
+              style: TextStyle(fontSize: 12, color: WalletPalette.textMuted, height: 1.3),
             ),
           ),
           const SizedBox(height: 22),
@@ -102,12 +115,33 @@ class _QrGeneratorSheetState extends State<QrGeneratorSheet> {
                           opacity: animation,
                           child: ScaleTransition(scale: Tween(begin: 0.97, end: 1.0).animate(animation), child: child),
                         ),
-                        child: QrImageView(
-                          key: ValueKey(payload),
-                          data: payload,
-                          size: 208,
-                          backgroundColor: Colors.white,
-                        ),
+                        child: isValid
+                            ? QrImageView(
+                                key: ValueKey(payload),
+                                data: payload,
+                                size: 208,
+                                backgroundColor: Colors.white,
+                              )
+                            : SizedBox(
+                                key: const ValueKey('empty'),
+                                width: 208,
+                                height: 208,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.qr_code_2_rounded, size: 40, color: WalletPalette.textFaint),
+                                    const SizedBox(height: 10),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: Text(
+                                        'Enter an amount above to generate your QR code',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(fontSize: 12.5, color: WalletPalette.textMuted, height: 1.3),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                       ),
                     ),
                   ),

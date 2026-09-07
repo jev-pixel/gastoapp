@@ -26,6 +26,31 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+
+	<!--
+	  Required for mobile_scanner (QrScannerSheet) to access the camera.
+	  Without this key, iOS refuses camera access entirely and the QR
+	  scanner will never show a live preview.
+	-->
+	<key>NSCameraUsageDescription</key>
+	<string>GastoApp needs camera access to scan QR codes for wallet payments.</string>
+
+	<!--
+	  Required for url_launcher's canLaunchUrl() (BankDeepLinkService) to
+	  detect these bank/e-wallet apps as installed on iOS. Without this
+	  key, canLaunchUrl() always returns false here and the app silently
+	  falls back to the App Store link instead of opening GCash/Maya/
+	  UnionBank/BDO for the user to authorize the payment.
+	  Schemes must match bankDeepLinks in qr_model.dart exactly.
+	-->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>gcash</string>
+		<string>paymaya</string>
+		<string>ubp</string>
+		<string>bdo.online</string>
+	</array>
+
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

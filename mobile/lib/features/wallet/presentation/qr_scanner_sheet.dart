@@ -67,6 +67,10 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
   Map<String, String>? _parse(String raw) {
     final parts = raw.split('|');
     if (parts.length < 2) return null;
+    // Guard against a malformed/garbled amount segment too — a code that
+    // matches the pipe format but has a non-numeric amount would otherwise
+    // slip through here and only fail later at the API call.
+    if (double.tryParse(parts[1]) == null) return null;
     return {
       'provider': parts[0].toLowerCase(),
       'amount': parts[1],
@@ -80,7 +84,21 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
     final raw = capture.barcodes.firstOrNull?.rawValue;
     if (raw == null) return;
     final parsed = _parse(raw);
-    if (parsed == null) return;
+    if (parsed == null) {
+      // Previously this returned silently, so scanning any code that
+      // wasn't a GastoApp-generated payment QR looked exactly like the
+      // scanner "not working" — no error, no feedback, nothing visible
+      // happened. detectionSpeed.noDuplicates already de-dupes repeated
+      // reads of the same static code, so this won't spam the snackbar.
+      HapticFeedback.selectionClick();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("That QR code isn't a valid GastoApp payment code."),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
 
     setState(() => _handled = true);
     HapticFeedback.mediumImpact();
