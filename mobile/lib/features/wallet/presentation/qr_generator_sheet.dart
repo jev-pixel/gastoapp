@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../domain/card_wallet_model.dart';
+import 'qr_ph_builder.dart';
 import 'wallet_theme.dart';
 
 class QrGeneratorSheet extends StatefulWidget {
@@ -36,7 +37,20 @@ class _QrGeneratorSheetState extends State<QrGeneratorSheet> {
     // scanned, so we gate rendering on a valid amount instead of letting
     // the user generate a code that's guaranteed to fail downstream.
     final isValid = amount > 0;
-    final payload = '${widget.wallet.provider.toLowerCase()}|$amount|${widget.wallet.name}|';
+    // Builds a spec-valid EMVCo/QR Ph payload (correct TLV + CRC) rather
+    // than the old pipe-delimited test string. This round-trips through
+    // QrPhParser cleanly — including passing CRC verification — so a
+    // GastoApp phone scanning another GastoApp-generated code works. It's
+    // still NOT interoperable with real GCash/Maya/bank scanners, since
+    // GastoApp doesn't hold a registered participant GUID; see the doc
+    // comment on QrPhBuilder for details.
+    final payload = isValid
+        ? QrPhBuilder.build(
+            cardWalletId: widget.wallet.id,
+            merchantName: widget.wallet.name,
+            amount: amount,
+          )
+        : '';
 
     return WalletSheetShell(
       child: Column(
@@ -154,7 +168,7 @@ class _QrGeneratorSheetState extends State<QrGeneratorSheet> {
             delay: const Duration(milliseconds: 110),
             child: Center(
               child: Text(
-                'Have the sender scan this in their banking app',
+                'Have the sender scan this from their GastoApp Scan to Pay screen',
                 style: TextStyle(color: WalletPalette.textMuted, fontSize: 12.5),
               ),
             ),
