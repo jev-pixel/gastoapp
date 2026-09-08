@@ -191,4 +191,17 @@ class CardWalletProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<bool> updateReceiveProxy({required String id, required String? receiveProxy}) async {
+  try {
+    await _repository.updateReceiveProxy(id: id, receiveProxy: receiveProxy);
+    await loadCardWallets();
+    return true;
+  } on ApiException catch (e) {
+    errorMessage = e.message;
+    notifyListeners();
+    return false;
+  }
+}
+
 }

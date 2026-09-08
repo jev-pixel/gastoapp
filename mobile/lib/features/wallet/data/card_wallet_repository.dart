@@ -1,7 +1,7 @@
 import '../../../core/api_client.dart';
 import '../domain/card_wallet_model.dart';
-import '../domain/wallet_model.dart';
 import '../domain/qr_model.dart';
+import '../domain/wallet_model.dart';
 
 class CardWalletRepository {
   final ApiClient _api;
@@ -109,6 +109,10 @@ Future<QrReservation> settleQrPayment(String reservationId) async {
 Future<QrReservation> cancelQrPayment(String reservationId) async {
   final json = await _api.post('/wallet/qr/$reservationId/cancel', {});
   return QrReservation.fromJson(json);
+}
+Future<CardWallet> updateReceiveProxy({required String id, required String? receiveProxy}) async {
+  final json = await _api.patch('/card-wallets/$id', {'receive_proxy': receiveProxy});
+  return CardWallet.fromJson(json);
 }
 
 }

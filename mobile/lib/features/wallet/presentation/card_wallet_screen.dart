@@ -10,8 +10,8 @@ import 'card_action_sheet.dart';
 import 'card_transfer_sheet.dart';
 import 'card_wallet_provider.dart';
 import 'qr_confirm_settlement_sheet.dart';
-import 'qr_generator_sheet.dart';
 import 'qr_scanner_sheet.dart';
+import 'request_payment_sheet.dart';
 import 'wallet_theme.dart';
 
 final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
@@ -100,7 +100,7 @@ class _CardWalletScreenState extends State<CardWalletScreen> {
   void _openReceive(CardWallet wallet) {
     showWalletSheet(
       context: context,
-      builder: (_) => QrGeneratorSheet(wallet: wallet),
+      builder: (_) => RequestPaymentSheet(wallet: wallet),
     );
   }
 

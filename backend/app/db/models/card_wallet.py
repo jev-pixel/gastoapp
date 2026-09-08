@@ -20,6 +20,13 @@ class CardWallet(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)     # user's custom label
     current_balance: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
 
+    # The mobile number, account number, or email the owner shares so
+    # others can pay them via that provider's own send-money/QR flow.
+    # Purely informational — GastoApp never transmits, validates, or
+    # resolves this against any bank/BSP registry, it just stores and
+    # displays it back to the owner for their own copy/share use.
+    receive_proxy: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="card_wallets")

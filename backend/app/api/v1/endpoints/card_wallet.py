@@ -72,6 +72,7 @@ async def create_card_wallet(
         provider=payload.provider,
         name=payload.name,
         current_balance=payload.current_balance,
+        receive_proxy=payload.receive_proxy,
     )
     db.add(wallet)
     await db.commit()

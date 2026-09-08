@@ -3,12 +3,14 @@ class CardWallet {
   final String provider;
   final String name;
   final double currentBalance;
+  final String? receiveProxy;
 
   CardWallet({
     required this.id,
     required this.provider,
     required this.name,
     required this.currentBalance,
+    this.receiveProxy,
   });
 
   factory CardWallet.fromJson(Map<String, dynamic> json) {
@@ -17,6 +19,7 @@ class CardWallet {
       provider: json['provider'] as String,
       name: json['name'] as String,
       currentBalance: (json['current_balance'] as num).toDouble(),
+      receiveProxy: json['receive_proxy'] as String?,
     );
   }
 }

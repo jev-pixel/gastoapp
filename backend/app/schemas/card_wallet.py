@@ -8,11 +8,13 @@ class CardWalletCreate(BaseModel):
     provider: str = Field(min_length=1, max_length=50)
     name: str = Field(min_length=1, max_length=120)
     current_balance: float = Field(ge=0, default=0)
+    receive_proxy: str | None = Field(default=None, max_length=120)
 
 
 class CardWalletUpdate(BaseModel):
     provider: str | None = None
     name: str | None = None
+    receive_proxy: str | None = None
 
 
 class CardWalletRead(BaseModel):
@@ -21,6 +23,7 @@ class CardWalletRead(BaseModel):
     provider: str
     name: str
     current_balance: float
+    receive_proxy: str | None = None
     created_at: datetime
 
 
