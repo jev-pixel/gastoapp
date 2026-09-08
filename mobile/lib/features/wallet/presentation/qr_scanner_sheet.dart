@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
+import '../domain/emv_qr_parser.dart';
 import '../domain/qr_model.dart';
 import 'card_wallet_provider.dart';
-import 'qr_ph_parser.dart';
 import 'wallet_theme.dart';
 
 class QrScannerSheet extends StatefulWidget {
@@ -27,15 +27,11 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
 
-  // Slow vertical sweep for the scan-line, mirrors the "searching" read of
-  // Apple's Wallet card-scan UI rather than a bare camera preview.
   late final AnimationController _scanLineController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1800),
   )..repeat(reverse: true);
 
-  // One-shot pulse played on the viewfinder frame the instant a code is
-  // recognized, before we even know if the reservation call succeeds.
   late final AnimationController _frameController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 500),
@@ -65,91 +61,80 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
     super.dispose();
   }
 
-  // Card wallets already carry a known provider (BDO/GCash/Maya/UnionBank/
-  // Other) — that's the source of truth for the deep link, never the QR
-  // content itself (the standard TLV doesn't reliably expose which app
-  // issued the code).
-  String _mapToBankProvider(String cardWalletProvider) {
-    switch (cardWalletProvider.toUpperCase()) {
-      case 'GCASH':
-        return 'gcash';
-      case 'MAYA':
-        return 'maya';
-      case 'UNIONBANK':
-        return 'unionbank';
-      case 'BDO':
-        return 'bdo';
-      default:
-        return 'other';
-    }
-  }
-
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_handled) return;
     final raw = capture.barcodes.firstOrNull?.rawValue;
     if (raw == null) return;
 
-    ParsedQrPh parsed;
+    EmvQrPayload payload;
     try {
-      parsed = QrPhParser.parse(raw);
-    } on QrPhParseException {
-      // Previously any non-matching code returned silently, so scanning
-      // anything but a GastoApp test QR looked exactly like the scanner
-      // "not working" — no error, no feedback, nothing visible happened.
-      // detectionSpeed.noDuplicates already de-dupes repeated reads of the
-      // same static code, so this won't spam the snackbar.
+      payload = EmvQrParser.parse(raw);
+    } on EmvQrParseException {
       HapticFeedback.selectionClick();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("That doesn't look like a valid GCash/Maya/bank QR code."),
+          content: Text("Couldn't read this as a payment QR code."),
           duration: Duration(seconds: 2),
         ),
       );
       return;
     }
 
-    // Static personal/merchant codes (the common case) carry no amount —
-    // that's normal, not an error. Ask the user before reserving.
-    double amount = parsed.amount ?? 0;
-    if (parsed.requiresManualAmount) {
-      _controller.stop(); // pause the camera while the user types
-      final entered = await _promptForAmount(parsed.merchantName);
-      if (!mounted) return;
-      if (entered == null) {
-        await _controller.start();
-        return; // user cancelled
-      }
-      amount = entered;
+    if (!payload.crcValid) {
+      HapticFeedback.selectionClick();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This code failed an integrity check — try scanning again.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
     }
 
     setState(() => _handled = true);
     HapticFeedback.mediumImpact();
     setState(() => _success = true);
     unawaited(_frameController.forward(from: 0));
-
-    // Brief pause so the success pulse is actually perceivable before the
-    // sheet navigates away — otherwise it flashes for a single frame.
     await Future.delayed(const Duration(milliseconds: 260));
     if (!mounted) return;
 
-    final cardProvider = context.read<CardWalletProvider>();
-    final wallet = cardProvider.byId(widget.cardWalletId);
-    final bankProvider = _mapToBankProvider(wallet?.provider ?? 'Other');
-
-    final reservation = await cardProvider.reserveQr(
-      cardWalletId: widget.cardWalletId,
-      amount: amount,
-      provider: bankProvider,
-      merchantName: parsed.merchantName,
-      // Not reliably extractable from the standard TLV — the actual
-      // settlement account lives in scheme-specific sub-fields of the
-      // nested Merchant Account Information templates (tags 26-51), which
-      // vary per participant GUID. destinationAccount is optional in the
-      // reservation schema, so this stays null and merchantName (tag 59,
-      // which IS standardized) carries the display info instead.
-      destinationAccount: null,
-      rawPayload: raw,
+    // Most real P2P QR Ph codes are static and carry no fixed amount —
+    // the payer always types it into their own banking app. Ask here too.
+    final confirmedAmount = await showModalBottomSheet<double>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AmountConfirmSheet(
+        merchantName: payload.merchantName,
+        proxyValue: payload.proxyValue,
+        initialAmount: payload.amount,
+      ),
     );
+
+    if (!mounted) return;
+    if (confirmedAmount == null || confirmedAmount <= 0) {
+      setState(() {
+        _handled = false;
+        _success = false;
+      });
+      return;
+    }
+
+    // Provider comes from the wallet the user is already inside in
+    // GastoApp — NOT from the QR. QR Ph doesn't identify a brand, and
+    // even GCash/Maya's own native codes don't tell us which app the
+    // *scanning* user wants to pay with; that's the user's own choice.
+    final wallet = context.read<CardWalletProvider>().byId(widget.cardWalletId);
+    final provider = (wallet?.provider ?? 'Other').toLowerCase();
+
+    final reservation = await context.read<CardWalletProvider>().reserveQr(
+          cardWalletId: widget.cardWalletId,
+          amount: confirmedAmount,
+          provider: provider,
+          merchantName: payload.merchantName,
+          destinationAccount: payload.proxyValue,
+          rawPayload: raw,
+        );
 
     if (!mounted) return;
     if (reservation == null) {
@@ -157,8 +142,7 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
         _handled = false;
         _success = false;
       });
-      await _controller.start();
-      final err = cardProvider.errorMessage;
+      final err = context.read<CardWalletProvider>().errorMessage;
       if (err != null) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
       }
@@ -166,35 +150,6 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
     }
 
     Navigator.of(context).pop<QrReservation>(reservation);
-  }
-
-  Future<double?> _promptForAmount(String? merchantName) {
-    final controller = TextEditingController();
-    return showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(
-          merchantName?.isNotEmpty == true ? 'Pay $merchantName' : 'Enter amount',
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(prefixText: '₱ '),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              final v = double.tryParse(controller.text);
-              Navigator.of(ctx).pop(v != null && v > 0 ? v : null);
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -208,8 +163,6 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
-            // Surfaces the real reason the camera preview isn't showing
-            // instead of the generic "!" placeholder icon.
             errorBuilder: (context, error) => _CameraError(
               message: error.errorDetails?.message ?? error.errorCode.name,
               onGoBack: () => Navigator.of(context).pop(),
@@ -248,10 +201,6 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
                     ),
                     Row(
                       children: [
-                        // mobile_scanner v5+ dropped the standalone
-                        // `controller.torchState` ValueListenable — torch
-                        // state now lives on `controller.value`, and the
-                        // controller itself is the ValueListenable.
                         ValueListenableBuilder<MobileScannerState>(
                           valueListenable: _controller,
                           builder: (context, state, _) => _GlassCircleButton(
@@ -285,26 +234,93 @@ class _QrScannerSheetState extends State<QrScannerSheet> with TickerProviderStat
                   delay: const Duration(milliseconds: 200),
                   offset: 8,
                   child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-                      ),
-                      child: const Text(
-                        'Align the QR code within the frame',
-                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                        ),
+                        child: const Text(
+                          'Align the QR code within the frame',
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ),
-                  ),
                   ),
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown right after a successful scan — collects/confirms the amount
+/// (most P2P QR Ph codes carry none) before a reservation is created.
+class _AmountConfirmSheet extends StatefulWidget {
+  const _AmountConfirmSheet({this.merchantName, this.proxyValue, this.initialAmount});
+  final String? merchantName;
+  final String? proxyValue;
+  final double? initialAmount;
+
+  @override
+  State<_AmountConfirmSheet> createState() => _AmountConfirmSheetState();
+}
+
+class _AmountConfirmSheetState extends State<_AmountConfirmSheet> {
+  late final _controller = TextEditingController(
+    text: (widget.initialAmount != null && widget.initialAmount! > 0)
+        ? widget.initialAmount!.toStringAsFixed(2)
+        : '',
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WalletSheetShell(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SheetHeader(title: 'Confirm Payment', icon: Icons.receipt_long_rounded),
+          if (widget.merchantName != null) ...[
+            Text('To: ${widget.merchantName}',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            const SizedBox(height: 4),
+          ],
+          if (widget.proxyValue != null) ...[
+            Text(widget.proxyValue!, style: TextStyle(color: WalletPalette.textMuted, fontSize: 12.5)),
+            const SizedBox(height: 14),
+          ],
+          SheetTextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            label: 'Amount (PHP)',
+            icon: Icons.payments_outlined,
+            prefixText: '₱ ',
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.initialAmount == null
+                ? "This code didn't specify an amount — enter what you're sending."
+                : 'Confirm the amount before continuing.',
+            style: TextStyle(fontSize: 12, color: WalletPalette.textMuted, height: 1.3),
+          ),
+          const SizedBox(height: 22),
+          SheetPrimaryButton(
+            label: 'Continue',
+            onTap: () => Navigator.of(context).pop(double.tryParse(_controller.text)),
           ),
         ],
       ),
@@ -361,11 +377,7 @@ class _CameraError extends StatelessWidget {
           children: [
             const Icon(Icons.no_photography_rounded, color: Colors.white70, size: 48),
             const SizedBox(height: 16),
-            Text(
-              'Camera unavailable:\n$message',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white),
-            ),
+            Text('Camera unavailable:\n$message', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
             const SizedBox(height: 16),
             FilledButton(onPressed: onGoBack, child: const Text('Go Back')),
           ],
@@ -375,16 +387,8 @@ class _CameraError extends StatelessWidget {
   }
 }
 
-/// Draws the dark scrim with a rounded-square cutout, animated corner
-/// brackets, and a glowing scan line — a proper "viewfinder" read instead
-/// of a bare camera feed with no framing.
 class _ViewfinderPainter extends CustomPainter {
-  _ViewfinderPainter({
-    required this.scanProgress,
-    required this.frameScale,
-    required this.success,
-  });
-
+  _ViewfinderPainter({required this.scanProgress, required this.frameScale, required this.success});
   final double scanProgress;
   final double frameScale;
   final bool success;
@@ -445,9 +449,7 @@ class _ViewfinderPainter extends CustomPainter {
       canvas.drawLine(
         Offset(rect.left + 8, lineY),
         Offset(rect.right - 8, lineY),
-        Paint()
-          ..color = accent.withValues(alpha: 0.9)
-          ..strokeWidth = 2,
+        Paint()..color = accent.withValues(alpha: 0.9)..strokeWidth = 2,
       );
     } else {
       final checkPaint = Paint()
