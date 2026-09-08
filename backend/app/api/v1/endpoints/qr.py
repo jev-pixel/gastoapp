@@ -11,15 +11,13 @@ from app.db.models.card_wallet import CardWallet
 from app.db.models.qr_reservation import BankProvider, QrReservation, QrReservationStatus
 from app.db.models.user import User
 from app.db.models.wallet_transaction import TransactionType, WalletTransaction
-from app.schemas.qr import QrDeepLinkInfo, QrReservationRead, QrReserveRequest
+from app.schemas.qr import CheckoutSessionRead, QrDeepLinkInfo, QrReservationRead, QrReserveRequest
+from app.services.payment_gateway_service import PaymongoError, create_checkout_session
 
 router = APIRouter(prefix="/api/v1/wallet/qr", tags=["qr"])
 
 RESERVATION_TTL_MINUTES = 15
 
-# iOS scheme also doubles as the Android launch URI in this app's deep-link
-# dispatcher — Flutter's url_launcher resolves it via the intent filter
-# declared in AndroidManifest.xml, so one scheme string covers both.
 _DEEP_LINKS = {
     BankProvider.GCASH: QrDeepLinkInfo(
         ios_scheme="gcash://", android_package="com.gcash",
@@ -44,10 +42,14 @@ _DEEP_LINKS = {
 }
 
 
-async def _get_owned_card_wallet_locked(card_wallet_id: uuid.UUID, db: AsyncSession, user: User) -> CardWallet:
+async def _get_owned_card_wallet_locked(
+    card_wallet_id: uuid.UUID, db: AsyncSession, user_id: uuid.UUID
+) -> CardWallet:
+    # Takes user_id (not a User object) now — the PayMongo webhook below
+    # has no authenticated User, only the reservation's stored user_id.
     result = await db.execute(
         select(CardWallet)
-        .where(CardWallet.id == card_wallet_id, CardWallet.user_id == user.id)
+        .where(CardWallet.id == card_wallet_id, CardWallet.user_id == user_id)
         .with_for_update()
     )
     wallet = result.scalar_one_or_none()
@@ -85,10 +87,7 @@ async def reserve_qr_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Row lock serializes concurrent scans against the same card wallet —
-    # this is what stops two parallel deep-links from both passing the
-    # balance check before either settles.
-    wallet = await _get_owned_card_wallet_locked(payload.card_wallet_id, db, current_user)
+    wallet = await _get_owned_card_wallet_locked(payload.card_wallet_id, db, current_user.id)
     await _expire_stale(db, wallet.id)
 
     reserved = await _active_reserved_total(db, wallet.id)
@@ -116,12 +115,74 @@ async def reserve_qr_payment(
     return reservation
 
 
+@router.post("/{reservation_id}/checkout", response_model=CheckoutSessionRead)
+async def create_reservation_checkout(
+    reservation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(QrReservation).where(QrReservation.id == reservation_id, QrReservation.user_id == current_user.id)
+    )
+    reservation = result.scalar_one_or_none()
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    if reservation.status != QrReservationStatus.PENDING:
+        raise HTTPException(status_code=400, detail=f"Reservation is already {reservation.status.value}")
+
+    try:
+        session = await create_checkout_session(
+            amount_php=float(reservation.amount),
+            description=reservation.merchant_name or "GastoApp payment",
+            reference_number=str(reservation.id),
+            success_url="https://gastoapp-production-b3d5.up.railway.app/paymongo/success",
+            cancel_url="https://gastoapp-production-b3d5.up.railway.app/paymongo/cancel",
+        )
+    except PaymongoError as e:
+        raise HTTPException(status_code=502, detail=f"Could not start checkout: {e}")
+
+    reservation.checkout_session_id = session["id"]
+    await db.commit()
+
+    return CheckoutSessionRead(
+        checkout_session_id=session["id"],
+        checkout_url=session["attributes"]["checkout_url"],
+    )
+
+
+async def _settle_reservation(reservation: QrReservation, db: AsyncSession) -> WalletTransaction:
+    """Shared by the manual /settle endpoint and the PayMongo webhook —
+    the actual balance-moving logic lives in exactly one place now."""
+    wallet = await _get_owned_card_wallet_locked(reservation.card_wallet_id, db, reservation.user_id)
+    if float(reservation.amount) > float(wallet.current_balance):
+        raise HTTPException(status_code=400, detail="Card wallet balance is no longer sufficient")
+
+    wallet.current_balance = float(wallet.current_balance) - float(reservation.amount)
+    tx = WalletTransaction(
+        user_id=reservation.user_id,
+        type=TransactionType.CARD_EXPENSE,
+        amount=reservation.amount,
+        description=reservation.merchant_name or f"QR payment via {reservation.provider.value}",
+        card_wallet_id=wallet.id,
+    )
+    db.add(tx)
+    await db.flush()
+
+    reservation.status = QrReservationStatus.SETTLED
+    reservation.related_transaction_id = tx.id
+    await db.commit()
+    return tx
+
+
 @router.post("/{reservation_id}/settle", response_model=QrReservationRead)
 async def settle_qr_payment(
     reservation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Manual fallback — used if the user cancels/backgrounds the PayMongo
+    checkout before the webhook fires, or completed payment some other
+    way and needs to confirm it themselves."""
     result = await db.execute(
         select(QrReservation).where(QrReservation.id == reservation_id, QrReservation.user_id == current_user.id)
     )
@@ -135,24 +196,7 @@ async def settle_qr_payment(
         await db.commit()
         raise HTTPException(status_code=410, detail="This reservation expired — please scan again")
 
-    wallet = await _get_owned_card_wallet_locked(reservation.card_wallet_id, db, current_user)
-    if float(reservation.amount) > float(wallet.current_balance):
-        raise HTTPException(status_code=400, detail="Card wallet balance is no longer sufficient")
-
-    wallet.current_balance = float(wallet.current_balance) - float(reservation.amount)
-    tx = WalletTransaction(
-        user_id=current_user.id,
-        type=TransactionType.CARD_EXPENSE,
-        amount=reservation.amount,
-        description=reservation.merchant_name or f"QR payment via {reservation.provider.value}",
-        card_wallet_id=wallet.id,
-    )
-    db.add(tx)
-    await db.flush()
-
-    reservation.status = QrReservationStatus.SETTLED
-    reservation.related_transaction_id = tx.id
-    await db.commit()
+    await _settle_reservation(reservation, db)
     await db.refresh(reservation)
     return reservation
 

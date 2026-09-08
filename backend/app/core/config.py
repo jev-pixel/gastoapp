@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     GEMINI_API_KEY: str = ""
+    PAYMONGO_SECRET_KEY: str = ""
+    PAYMONGO_WEBHOOK_SECRET: str = ""
 
 
 settings = Settings()

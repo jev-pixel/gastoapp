@@ -19,6 +19,8 @@ class QrReservation {
     required this.expiresAt,
   });
 
+  
+
   factory QrReservation.fromJson(Map<String, dynamic> json) => QrReservation(
         id: json['id'] as String,
         cardWalletId: json['card_wallet_id'] as String,
@@ -28,6 +30,17 @@ class QrReservation {
         destinationAccount: json['destination_account'] as String?,
         status: json['status'] as String,
         expiresAt: DateTime.parse(json['expires_at'] as String),
+      );
+}
+
+class CheckoutSession {
+  final String checkoutSessionId;
+  final String checkoutUrl;
+  CheckoutSession({required this.checkoutSessionId, required this.checkoutUrl});
+
+  factory CheckoutSession.fromJson(Map<String, dynamic> json) => CheckoutSession(
+        checkoutSessionId: json['checkout_session_id'] as String,
+        checkoutUrl: json['checkout_url'] as String,
       );
 }
 

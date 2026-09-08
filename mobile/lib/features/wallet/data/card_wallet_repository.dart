@@ -101,6 +101,11 @@ class CardWalletRepository {
   return QrReservation.fromJson(json);
 }
 
+Future<CheckoutSession> createCheckoutSession(String reservationId) async {
+  final json = await _api.post('/wallet/qr/$reservationId/checkout', {});
+  return CheckoutSession.fromJson(json);
+}
+
 Future<QrReservation> settleQrPayment(String reservationId) async {
   final json = await _api.post('/wallet/qr/$reservationId/settle', {});
   return QrReservation.fromJson(json);

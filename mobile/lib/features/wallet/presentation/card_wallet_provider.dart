@@ -169,6 +169,16 @@ class CardWalletProvider extends ChangeNotifier {
     }
   }
 
+  Future<CheckoutSession?> createCheckoutSession(String reservationId) async {
+    try {
+      return await _repository.createCheckoutSession(reservationId);
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<bool> confirmQrSettlement(String reservationId) async {
     try {
       await _repository.settleQrPayment(reservationId);

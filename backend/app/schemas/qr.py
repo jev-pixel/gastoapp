@@ -32,3 +32,7 @@ class QrDeepLinkInfo(BaseModel):
     android_package: str
     store_fallback_ios: str
     store_fallback_android: str
+
+class CheckoutSessionRead(BaseModel):
+    checkout_session_id: str
+    checkout_url: str

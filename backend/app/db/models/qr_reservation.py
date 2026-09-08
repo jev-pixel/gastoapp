@@ -39,6 +39,7 @@ class QrReservation(Base):
         Enum(QrReservationStatus, name="qrreservationstatus"),
         default=QrReservationStatus.PENDING, nullable=False,
     )
+    checkout_session_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     related_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("wallet_transactions.id", ondelete="SET NULL"), nullable=True
     )
@@ -48,3 +49,4 @@ class QrReservation(Base):
 
     user: Mapped["User"] = relationship()
     card_wallet: Mapped["CardWallet"] = relationship()
+    
